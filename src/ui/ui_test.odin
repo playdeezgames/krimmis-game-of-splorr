@@ -161,28 +161,57 @@ removal_clears_the_selection :: proc(t: ^testing.T) {
 }
 
 @(test)
-krimmis_eve_with_nothing_done_is_coal_then_enter_restarts :: proc(t: ^testing.T) {
+krimmis_eve_with_nothing_done_reveals_then_coal_then_title :: proc(t: ^testing.T) {
 	s := new_state(1)
 	for _ in 0 ..< game.DAYS {
 		key(&s, .End_Day)
 	}
-	testing.expect_value(t, s.mode, Mode.Over)
-	key(&s, .End_Day) // ignored
-	testing.expect_value(t, s.mode, Mode.Over)
+	testing.expect_value(t, s.mode, Mode.Eve)
+	testing.expect_value(t, s.verdict, game.Outcome.Coal)
+	testing.expect_value(t, s.eve.year, 1)
+	testing.expect_value(t, s.eve.standing, game.standing(&s.g))
+	key(&s, .End_Day) // ignored on a full screen
+	testing.expect_value(t, s.mode, Mode.Eve)
+	key(&s, .Confirm)
+	testing.expect_value(t, s.mode, Mode.Coal)
+	key(&s, .Confirm)
+	testing.expect_value(t, s.mode, Mode.Title)
+	testing.expect_value(t, s.g.day, 1)
+	key(&s, .Confirm)
+	testing.expect_value(t, s.mode, Mode.Play)
+}
+
+@(test)
+a_promotion_shows_the_reveal_then_the_promotion_then_the_new_year :: proc(t: ^testing.T) {
+	s := new_state(1)
+	s.g.day = game.DAYS
+	s.g.merit = 90
+	key(&s, .End_Day)
+	testing.expect_value(t, s.mode, Mode.Eve)
+	testing.expect_value(t, s.verdict, game.Outcome.Promoted)
+	// The reveal keeps last year's numbers even though the game has already moved on.
+	testing.expect_value(t, s.eve.merit, 90)
+	testing.expect_value(t, s.eve.year, 1)
+	testing.expect_value(t, s.g.rung, 1)
+	testing.expect_value(t, s.g.merit, 0)
+	key(&s, .Confirm)
+	testing.expect_value(t, s.mode, Mode.Promotion)
 	key(&s, .Confirm)
 	testing.expect_value(t, s.mode, Mode.Play)
 	testing.expect_value(t, s.g.day, 1)
 }
 
 @(test)
-a_promotion_starts_the_next_year :: proc(t: ^testing.T) {
-	s := new_state(1)
-	s.g.day = game.DAYS
-	s.g.merit = 90
-	key(&s, .End_Day)
+the_title_waits_for_a_click_or_enter :: proc(t: ^testing.T) {
+	s := new_state(1, .Title)
+	key(&s, .Surveil)
+	key(&s, .Place_1)
+	testing.expect_value(t, s.mode, Mode.Title)
+	click(&s, 10, 10)
 	testing.expect_value(t, s.mode, Mode.Play)
-	testing.expect_value(t, s.g.rung, 1)
-	testing.expect_value(t, s.g.day, 1)
+	s = new_state(1, .Title)
+	key(&s, .Confirm)
+	testing.expect_value(t, s.mode, Mode.Play)
 }
 
 @(test)
@@ -244,7 +273,7 @@ event_log_keeps_the_latest_lines_and_wraps :: proc(t: ^testing.T) {
 	}
 	s.g.day = game.DAYS
 	s.g.merit = 90
-	key(&s, .End_Day) // promotion: a long line
+	key(&s, .End_Day) // Krimmis Eve: a long line
 	testing.expect(t, s.latest >= 1)
 	testing.expect_value(t, log_line(&s, LOG_VISIBLE - 1) != "", true)
 }

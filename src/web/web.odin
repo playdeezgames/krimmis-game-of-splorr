@@ -10,7 +10,7 @@ import "krimmis:ui"
 s: ui.State
 
 main :: proc() {
-	s = ui.new_state(u64(time.now()._nsec))
+	s = ui.new_state(u64(time.now()._nsec), .Title)
 }
 
 // Keeps odin.js from ending the program straight after main (see Tech/Odin wasm recipe).
@@ -31,6 +31,17 @@ platform_click :: proc "c" (x, y: i32) {
 platform_key :: proc "c" (k: i32) {
 	context = runtime.default_context()
 	ui.key(&s, ui.Key(k))
+}
+
+// For QA and screenshots: jump straight to a full screen (the page does this from #eve, #coal, #promotion).
+// The reveal then shows a fresh game's numbers.
+@(export)
+platform_qa_mode :: proc "c" (m: i32) {
+	context = runtime.default_context()
+	s.mode = ui.Mode(m)
+	if s.mode == .Promotion {
+		s.g.rung = 1
+	}
 }
 
 @(export)

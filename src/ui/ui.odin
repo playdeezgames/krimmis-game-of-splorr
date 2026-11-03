@@ -15,9 +15,24 @@ Place :: enum {
 	Workshop,
 }
 
+// What is on screen. Title, Eve, Coal and Promotion are full screens that Enter (or a click) moves past:
+// Title to Play; Eve (the reveal) to Coal or Promotion; Coal back to Title; Promotion on to the new year.
 Mode :: enum {
+	Title,
 	Play,
-	Over, // coal: Enter starts again (the Eve screens task replaces this with proper screens)
+	Eve,
+	Coal,
+	Promotion,
+}
+
+// What the Eve screen reveals, captured before the new year (if any) resets the game.
+Eve_Report :: struct {
+	standing: int,
+	line:     f64,
+	debt:     int,
+	merit:    int,
+	alive:    int, // neighbours still standing
+	year:     int, // the year just played, from 1
 }
 
 Action :: enum {
@@ -65,14 +80,17 @@ State :: struct {
 	msg_len:  int,
 	log:      [LOG_VISIBLE]Log_Line, // the latest messages wrapped into lines, newest at the bottom
 	latest:   int, // how many of the bottom lines belong to the latest message
+	eve:      Eve_Report,
+	verdict:  game.Outcome, // Coal or Promoted, shown after the reveal
 }
 
-new_state :: proc(seed: u64) -> State {
+new_state :: proc(seed: u64, mode := Mode.Play) -> State {
 	s := State {
 		g        = game.new_game(seed),
 		seed     = seed,
 		place    = .Neighbourhood,
 		selected = -1,
+		mode     = mode,
 	}
 	say(&s, "Welcome to Krimmis, elf. Your name is on the List.")
 	return s
@@ -192,8 +210,8 @@ target_ok :: proc(g: ^game.Game, i: int) -> bool {
 
 // A click or tap at a point on the 320 by 240 screen.
 click :: proc(s: ^State, x, y: int) {
-	if s.mode == .Over {
-		restart(s)
+	if s.mode != .Play {
+		advance(s)
 		return
 	}
 	for p in Place {
@@ -221,9 +239,9 @@ click :: proc(s: ^State, x, y: int) {
 }
 
 key :: proc(s: ^State, k: Key) {
-	if s.mode == .Over {
+	if s.mode != .Play {
 		if k == .Confirm {
-			restart(s)
+			advance(s)
 		}
 		return
 	}
@@ -258,9 +276,18 @@ key :: proc(s: ^State, k: Key) {
 	}
 }
 
+// Moves past a full screen.
 @(private)
-restart :: proc(s: ^State) {
-	s^ = new_state(s.seed + 1)
+advance :: proc(s: ^State) {
+	switch s.mode {
+	case .Title, .Promotion:
+		s.mode = .Play
+	case .Eve:
+		s.mode = .Coal if s.verdict == .Coal else .Promotion
+	case .Coal:
+		s^ = new_state(s.seed + 1, .Title) // a fresh run, a fresh seed
+	case .Play:
+	}
 }
 
 @(private)
@@ -383,15 +410,19 @@ end_the_day :: proc(s: ^State) {
 		sayf(s, "Night. Tithes +%d Coin.%s", r.tithe_coin, taken)
 		return
 	}
-	switch game.resolve_eve(g) {
-	case .Coal:
-		s.mode = .Over
-		sayf(s, "Krimmis Eve.%s Standing short. Coal. Press Enter.", taken)
-	case .Promoted:
-		s.selected = -1
-		sayf(s, "Krimmis Eve.%s Promoted to Head Elf! A new List.", taken)
-	case .Playing:
+	// Capture the reveal before a promotion resets the game for the new year.
+	s.eve = Eve_Report {
+		standing = game.standing(g),
+		line     = game.nice_line(game.DAYS, g.rung),
+		debt     = g.debt,
+		merit    = g.merit,
+		alive    = game.alive_count(g),
+		year     = g.rung + 1,
 	}
+	s.verdict = game.resolve_eve(g)
+	s.selected = -1
+	s.mode = .Eve
+	sayf(s, "Krimmis Eve.%s Kris Krinkle checks the List.", taken)
 }
 
 // ---- text the page draws -------------------------------------------------------------------------------

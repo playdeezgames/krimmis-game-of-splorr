@@ -83,6 +83,15 @@
 				const src = rgb === NO_TINT ? sheets.tiles : tintedSheet("tiles", rgb);
 				ctx.drawImage(src, 13 * col + 1, 13 * row + 1, 12, 12, x, y, 12, 12);
 			},
+			draw_glyphs_scaled: (ptr, n, x, y, rgb, scale) => {
+				if (!ready("font")) return;
+				const src = rgb === NO_TINT ? sheets.font : tintedSheet("font", rgb);
+				const codes = memory.loadBytes(ptr, n);
+				for (let i = 0; i < n; i++) {
+					const c = codes[i];
+					ctx.drawImage(src, (c % 16) * 6, Math.floor(c / 16) * 8, 6, 8, x + i * 6 * scale, y, 6 * scale, 8 * scale);
+				}
+			},
 			draw_glyphs: (ptr, n, x, y, rgb) => {
 				if (!ready("font")) return;
 				const src = rgb === NO_TINT ? sheets.font : tintedSheet("font", rgb);
@@ -129,6 +138,9 @@
 		function boot() {
 			if (!memory.exports || !memory.exports.platform_frame) { requestAnimationFrame(boot); return; }
 			ex = memory.exports;
+			// QA and screenshots: #title, #play, #eve, #coal or #promotion jumps to that screen (ui.Mode order).
+			const qa = ["title", "play", "eve", "coal", "promotion"].indexOf(location.hash.slice(1));
+			if (qa >= 0) ex.platform_qa_mode(qa);
 			requestAnimationFrame(frame);
 		}
 		odin.runWasm("game.wasm", null, { env: host }, memory);

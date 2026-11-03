@@ -10,6 +10,7 @@ foreign host {
 	fill_rect :: proc(x, y, w, h: i32, rgb: i32) ---
 	draw_tile :: proc(col, row, x, y: i32, rgb: i32) ---
 	draw_glyphs :: proc(text: [^]u8, n: i32, x, y: i32, rgb: i32) ---
+	draw_glyphs_scaled :: proc(text: [^]u8, n: i32, x, y: i32, rgb: i32, scale: i32) ---
 }
 
 NO_TINT :: -1
@@ -33,4 +34,16 @@ draw_text_centred :: proc(s: string, y: int, rgb: i32) {
 
 put_tile :: proc(col, row, x, y: int, rgb: i32) {
 	draw_tile(i32(col), i32(row), i32(x), i32(y), rgb)
+}
+
+// Big text for titles: whole-number scale, so the pixels stay square.
+draw_text_big :: proc(s: string, x, y: int, rgb: i32, scale: int) {
+	if len(s) == 0 {
+		return
+	}
+	draw_glyphs_scaled(raw_data(s), i32(len(s)), i32(x), i32(y), rgb, i32(scale))
+}
+
+draw_text_big_centred :: proc(s: string, y: int, rgb: i32, scale: int) {
+	draw_text_big(s, (SCREEN_W - len(s) * GLYPH_W * scale) / 2, y, rgb, scale)
 }

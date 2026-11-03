@@ -21,6 +21,21 @@ PERSON_TILE_COL :: 104 // Urizen: a plain human figure
 PERSON_TILE_ROW :: 0
 
 draw_frame :: proc(s: ^ui.State) {
+	switch s.mode {
+	case .Title:
+		draw_title()
+	case .Eve:
+		draw_eve(s)
+	case .Coal:
+		draw_coal(s)
+	case .Promotion:
+		draw_promotion(s)
+	case .Play:
+		draw_play(s)
+	}
+}
+
+draw_play :: proc(s: ^ui.State) {
 	clear_screen(BLACK)
 	draw_tabs(s)
 	draw_hud(s)
@@ -34,11 +49,76 @@ draw_frame :: proc(s: ^ui.State) {
 	}
 	draw_buttons(s)
 	draw_log(s)
-	if s.mode == .Over {
-		fill_rect(40, 90, 240, 50, 0x200000)
-		draw_text_centred("C O A L", 98, RED)
-		draw_text_centred("The List has spoken. Press Enter.", 116, WHITE)
+}
+
+// ---- full screens ----
+
+// A garland of alternating red and green stars along a row.
+draw_garland :: proc(y: int) {
+	for i in 0 ..< SCREEN_W / (GLYPH_W * 2) {
+		draw_text("*", i * GLYPH_W * 2 + 3, y, RED if i % 2 == 0 else GREEN)
 	}
+}
+
+draw_title :: proc() {
+	clear_screen(BLACK)
+	draw_garland(8)
+	draw_garland(224)
+	draw_text_big_centred("KRIMMIS", 34, RED, 5)
+	draw_text_centred("The Season of Giving (Giving Up)", 82, GOLD)
+	put_tile(PERSON_TILE_COL, PERSON_TILE_ROW, (SCREEN_W - TILE) / 2, 106, GREEN)
+	draw_text_centred("Welcome to the Mall, elf. It's your first day", 126, WHITE)
+	draw_text_centred("as Assistant to the Regional Manager of Joy.", 136, WHITE)
+	draw_text_centred("Kris Krinkle is watching. Kris Krinkle", 152, GREY)
+	draw_text_centred("is always watching. Your name is on the List.", 162, GREY)
+	draw_text_centred("Click or press Enter to clock in", 188, GOLD)
+	draw_text_centred("1-3 places  arrows pick  S I G B E act", 206, DIM)
+}
+
+draw_eve :: proc(s: ^ui.State) {
+	e := s.eve
+	clear_screen(0x000010)
+	draw_garland(8)
+	draw_text_big_centred("KRIMMIS EVE", 24, GOLD, 3)
+	draw_text_centred("Kris Krinkle has checked the List. Twice.", 60, WHITE)
+	buf: [64]u8
+	draw_text_centred(fmt.bprintf(buf[:], "Year %d of service", e.year), 82, GREY)
+	draw_text_centred(fmt.bprintf(buf[:], "Your Standing . . . . %d", e.standing), 104, WHITE)
+	draw_text_centred(fmt.bprintf(buf[:], "The Nice line . . . . %.0f", e.line), 116, WHITE)
+	draw_text_centred(fmt.bprintf(buf[:], "Owed to Krimmis Inc.  %d", e.debt), 128, GOLD)
+	draw_text_centred(fmt.bprintf(buf[:], "Neighbours remaining  %d of %d", e.alive, game.NEIGHBOURS), 140, GREY)
+	draw_text_centred("He is ready to read the verdict.", 170, WHITE)
+	draw_text_centred("Click or press Enter", 196, GOLD)
+	draw_garland(224)
+}
+
+draw_coal :: proc(s: ^ui.State) {
+	clear_screen(0x180000)
+	draw_garland(8)
+	draw_text_big_centred("COAL", 28, RED, 6)
+	draw_text_centred("You have been moved to the Naughty column.", 84, WHITE)
+	draw_text_centred("The Coal Collection will see you now.", 98, WHITE)
+	put_tile(PERSON_TILE_COL, PERSON_TILE_ROW, (SCREEN_W - TILE) / 2, 120, 0x303030)
+	draw_text_centred("Your Debt is forgiven (by the Coal Collection).", 146, GREY)
+	draw_text_centred("Merry Krimmis from all of us at Krimmis Inc.", 166, GOLD)
+	draw_text_centred("Click or press Enter to clock in again", 196, WHITE)
+	draw_garland(224)
+}
+
+draw_promotion :: proc(s: ^ui.State) {
+	clear_screen(0x001000)
+	draw_garland(8)
+	draw_text_big_centred("PROMOTED", 24, GOLD, 4)
+	draw_text_centred("HEAD ELF", 64, GREEN)
+	draw_text_centred("Congratulations. You are Nice. This is your reward:", 88, WHITE)
+	draw_text_centred("Kris Krinkle hands you next year's List.", 108, WHITE)
+	draw_text_centred("It is longer. Everyone you left on the Nice", 122, GREY)
+	draw_text_centred("List will owe us next year. So will you.", 132, GREY)
+	buf: [64]u8
+	draw_text_centred(fmt.bprintf(buf[:], "Year %d begins. Same Debt, higher quota.", s.g.rung + 1), 156, GOLD)
+	draw_text_centred("New families have moved in. Please welcome them.", 168, GREY)
+	draw_text_centred("Click or press Enter to accept", 196, WHITE)
+	draw_garland(224)
 }
 
 // Numbers, the 24-door advent calendar and the Standing bar, in three rows under the tabs.
