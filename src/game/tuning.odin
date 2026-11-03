@@ -1,0 +1,43 @@
+package game
+
+// Every balance number in one place. These mirror tools/balance_sim.py (the DEFAULTS in its P table);
+// change them together and rerun the sim. Values come from the vault note's "Economy numbers" section.
+
+DAYS :: 24 // days until Krimmis Eve
+ACTIONS_PER_DAY :: 3
+NEIGHBOURS :: 12
+
+START_COIN :: 30
+START_DEBT :: 30
+
+// Surveil
+SURVEIL_CHANCE :: 0.75
+SURVEIL_DIRT :: 2
+NOTICE_LIMIT :: 3 // Suspicion at which a neighbour reports you
+NOTICE_PENALTY :: 5 // Merit lost when they do
+
+// Inform
+INFORM_COST_LOW :: 3 // Dirt
+INFORM_COST_HIGH :: 5
+INFORM_CHANCE_LOW :: 0.60
+INFORM_CHANCE_HIGH :: 0.90
+INFORM_MERIT :: 6
+INFORM_FAIL_MERIT :: -3
+
+// Gift
+GIFT_PRICE :: 5 // Coin; rises by GIFT_PRICE_WEEKLY each week
+GIFT_PRICE_WEEKLY :: 1
+GIFT_MERIT :: 2
+GIFT_DEBT :: 8 // added to the recipient
+
+// Night
+TITHE_DIVISOR :: 4 // a neighbour pays 1 Coin per 4 Debt
+TITHE_CUT :: 0.5 // the share you keep
+OWN_MIN_PAYMENT :: 1
+OWN_INTEREST :: 0.03
+COAL_EVERY :: 2 // the Coal Collection takes one Naughty every second night
+
+// Standing and the Nice line
+DEBT_PER_STANDING :: 5 // Standing = Merit - Debt / 5
+LINE_BASE :: 10.0
+LINE_SLOPE :: 1.7 // Nice line on day d = 10 + 1.7 d

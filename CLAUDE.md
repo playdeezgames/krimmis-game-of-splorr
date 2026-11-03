@@ -24,7 +24,7 @@ Three layers, as in JetLag and the other SPLORR!! web games:
 - `src/web` (package `main`, `#+build js`): the thin wasm layer. It exports `proc "c"` platform functions (`platform_day`, `platform_end_day`, ...) and a `step` that only keeps `odin.js` alive. It imports the game as `krimmis:game` (build passes `-collection:krimmis=src`).
 - `web/index.html`: owns the canvas, input and (later) sound; it calls the exports through `memory.exports`. It carries the release-standard footer (itch.io and more-games back links, AI disclosure). Keep the exported names and any enum values in the page in step with `src/`.
 
-The scaffold only has the calendar (24 days, 3 actions, 12 neighbours); the loop is not built yet. Build the next tasks from Coxswain, in the order the vault note's core loop gives.
+Built so far: the calendar, the state (resources, 12 neighbours), a seeded xoshiro RNG (`rng.odin`, so runs are reproducible per seed) and `tuning.odin`, the single block of balance constants that mirrors `tools/balance_sim.py` (change both together). The actions and reckoning are not built yet. Build the next tasks from Coxswain, in the order the vault note's core loop gives.
 
 ## The project
 

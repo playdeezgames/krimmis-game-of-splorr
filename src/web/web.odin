@@ -5,12 +5,13 @@ package main
 
 import "base:runtime"
 import "core:fmt"
+import "core:time"
 import "krimmis:game"
 
 g: game.Game
 
 main :: proc() {
-	g = game.new_game()
+	g = game.new_game(u64(time.now()._nsec))
 }
 
 // Keeps odin.js from ending the program straight after main (see Tech/Odin wasm recipe).

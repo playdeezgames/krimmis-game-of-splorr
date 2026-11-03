@@ -1,19 +1,40 @@
 // All the rules of Krimmis live here, with no browser imports, so they build and test natively.
-// This is the scaffold: the state and the calendar only. The loop is specified in the vault note
-// Games/Krimmis of SPLORR!!.md and tools/balance_sim.py holds the tuned numbers.
+// The loop is specified in the vault note Games/Krimmis of SPLORR!!.md; tuning.odin holds the numbers.
 package game
 
-DAYS :: 24 // days until Krimmis Eve
-ACTIONS_PER_DAY :: 3
-NEIGHBOURS :: 12
-
-Game :: struct {
-	day:     int, // 1 to DAYS
-	actions: int, // left today
+Neighbour :: struct {
+	role:       int, // index into the roster (the roster task fills these in)
+	suspicion:  int, // how close they are to reporting you
+	debt:       int, // what they owe Krimmis Inc. in tithes
+	naughty:    bool, // on the Naughty List, waiting for the Coal Collection
+	alive:      bool, // false once the Coal Collection has been
+	grudge:     int, // how much they remember being informed on (used by the content task)
 }
 
-new_game :: proc() -> Game {
-	return Game{day = 1, actions = ACTIONS_PER_DAY}
+Game :: struct {
+	day:        int, // 1 to DAYS
+	actions:    int, // left today
+	merit:      int,
+	dirt:       int,
+	coin:       int,
+	debt:       int, // your own Debt to Krimmis Inc.
+	warnings:   int,
+	neighbours: [NEIGHBOURS]Neighbour,
+	rng:        Rng,
+}
+
+new_game :: proc(seed: u64) -> Game {
+	g := Game {
+		day     = 1,
+		actions = ACTIONS_PER_DAY,
+		coin    = START_COIN,
+		debt    = START_DEBT,
+		rng     = rng_seed(seed),
+	}
+	for &n, i in g.neighbours {
+		n = Neighbour{role = i, alive = true}
+	}
+	return g
 }
 
 // Ends the day. Returns false once Krimmis Eve has passed.
@@ -24,4 +45,24 @@ end_day :: proc(g: ^Game) -> bool {
 	g.day += 1
 	g.actions = ACTIONS_PER_DAY
 	return true
+}
+
+// Your rank on the Nice List: Merit less a fifth of your Debt.
+standing :: proc(g: ^Game) -> int {
+	return g.merit - g.debt / DEBT_PER_STANDING
+}
+
+// The Standing you must hold on a given day.
+nice_line :: proc(day: int) -> f64 {
+	return LINE_BASE + LINE_SLOPE * f64(day)
+}
+
+alive_count :: proc(g: ^Game) -> int {
+	count := 0
+	for n in g.neighbours {
+		if n.alive {
+			count += 1
+		}
+	}
+	return count
 }
