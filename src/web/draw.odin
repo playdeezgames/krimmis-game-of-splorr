@@ -30,3 +30,7 @@ draw_text :: proc(s: string, x, y: int, rgb: i32) {
 draw_text_centred :: proc(s: string, y: int, rgb: i32) {
 	draw_text(s, (SCREEN_W - len(s) * GLYPH_W) / 2, y, rgb)
 }
+
+put_tile :: proc(col, row, x, y: int, rgb: i32) {
+	draw_tile(i32(col), i32(row), i32(x), i32(y), rgb)
+}

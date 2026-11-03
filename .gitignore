@@ -2,3 +2,4 @@ build/
 /game
 /odin
 __pycache__/
+/ui

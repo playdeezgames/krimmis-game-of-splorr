@@ -1,17 +1,16 @@
 #+build js
 // The thin browser layer. The page owns requestAnimationFrame and calls the exports below.
-// Everything with rules in it is in package game.
+// All the rules are in package game and all the menu logic is in package ui; this only draws and relays.
 package main
 
 import "base:runtime"
-import "core:fmt"
 import "core:time"
-import "krimmis:game"
+import "krimmis:ui"
 
-g: game.Game
+s: ui.State
 
 main :: proc() {
-	g = game.new_game(u64(time.now()._nsec))
+	s = ui.new_state(u64(time.now()._nsec))
 }
 
 // Keeps odin.js from ending the program straight after main (see Tech/Odin wasm recipe).
@@ -20,26 +19,23 @@ step :: proc(dt: f64, c: runtime.Context) -> bool {
 	return true
 }
 
+// A click or tap, in 320 by 240 screen coordinates.
 @(export)
-platform_day :: proc "c" () -> i32 {
-	return i32(g.day)
-}
-
-@(export)
-platform_end_day :: proc "c" () -> bool {
+platform_click :: proc "c" (x, y: i32) {
 	context = runtime.default_context()
-	return !game.end_day(&g).refused
+	ui.click(&s, int(x), int(y))
 }
 
-// Placeholder screen that proves the shim: title, calendar, one Urizen tile. Replaced by the scenes task.
+// A key, as a ui.Key number.
+@(export)
+platform_key :: proc "c" (k: i32) {
+	context = runtime.default_context()
+	ui.key(&s, ui.Key(k))
+}
+
 @(export)
 platform_frame :: proc "c" (dt: f64) {
 	context = runtime.default_context()
-	clear_screen(0x000000)
-	draw_text_centred("K R I M M I S", 90, 0xffffff)
-	buf: [32]u8
-	line := fmt.bprintf(buf[:], "Day %d of %d", g.day, game.DAYS)
-	draw_text_centred(line, 110, 0xc0c0c0)
-	draw_tile(104, 0, (SCREEN_W - TILE) / 2, 130, NO_TINT)
-	draw_text_centred("tap to end the day", 160, 0x808080)
+	draw_frame(&s)
+	free_all(context.temp_allocator)
 }

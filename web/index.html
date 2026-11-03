@@ -53,9 +53,21 @@
 				c.width = img.width; c.height = img.height;
 				const g = c.getContext("2d");
 				g.drawImage(img, 0, 0);
-				g.globalCompositeOperation = "source-in";
-				g.fillStyle = "#" + (rgb & 0xffffff).toString(16).padStart(6, "0");
-				g.fillRect(0, 0, c.width, c.height);
+				const colour = "#" + (rgb & 0xffffff).toString(16).padStart(6, "0");
+				if (name === "font") {
+					// The font is ink on transparency: paint the ink in the colour.
+					g.globalCompositeOperation = "source-in";
+					g.fillStyle = colour;
+					g.fillRect(0, 0, c.width, c.height);
+				} else {
+					// The tiles are white figures on an opaque black ground: multiply recolours the white and keeps the
+					// black, and destination-in puts the sheet's own transparency (its gaps) back.
+					g.globalCompositeOperation = "multiply";
+					g.fillStyle = colour;
+					g.fillRect(0, 0, c.width, c.height);
+					g.globalCompositeOperation = "destination-in";
+					g.drawImage(img, 0, 0);
+				}
 				tinted[key] = c;
 			}
 			return c;
@@ -83,9 +95,27 @@
 		};
 
 		// ---- input ----
+		// Must match ui.Key in src/ui/ui.odin.
+		const KEY = { PLACE_1: 1, PLACE_2: 2, PLACE_3: 3, LEFT: 4, RIGHT: 5, UP: 6, DOWN: 7, SURVEIL: 8, INFORM: 9, GIFT: 10, BUY: 11, END_DAY: 12, CONFIRM: 13 };
+		const KEYS = {
+			Digit1: KEY.PLACE_1, Digit2: KEY.PLACE_2, Digit3: KEY.PLACE_3,
+			ArrowLeft: KEY.LEFT, KeyA: KEY.LEFT, ArrowRight: KEY.RIGHT, KeyD: KEY.RIGHT,
+			ArrowUp: KEY.UP, KeyW: KEY.UP, ArrowDown: KEY.DOWN,
+			KeyS: KEY.SURVEIL, KeyI: KEY.INFORM, KeyG: KEY.GIFT, KeyB: KEY.BUY, KeyE: KEY.END_DAY,
+			Enter: KEY.CONFIRM, Space: KEY.CONFIRM,
+		};
+		window.addEventListener("keydown", e => {
+			if (!ex || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+			const k = KEYS[e.code];
+			if (k === undefined) return;
+			e.preventDefault();
+			ex.platform_key(k);
+		});
 		screen.addEventListener("pointerdown", e => {
 			e.preventDefault();
-			if (ex) ex.platform_end_day();
+			if (!ex) return;
+			const r = screen.getBoundingClientRect();
+			ex.platform_click(Math.floor((e.clientX - r.left) / r.width * W), Math.floor((e.clientY - r.top) / r.height * H));
 		});
 
 		// ---- loop ----
