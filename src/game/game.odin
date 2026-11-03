@@ -2,6 +2,12 @@
 // The loop is specified in the vault note Games/Krimmis of SPLORR!!.md; tuning.odin holds the numbers.
 package game
 
+Outcome :: enum {
+	Playing,
+	Coal, // the run is over
+	Promoted, // set only for the moment of promotion; the next year is already under way
+}
+
 Neighbour :: struct {
 	role:       int, // index into the roster (the roster task fills these in)
 	suspicion:  int, // how close they are to reporting you
@@ -21,6 +27,8 @@ Game :: struct {
 	debt:       int, // your own Debt to Krimmis Inc.
 	warnings:   int,
 	eve_reached: bool, // the night of day DAYS has run; the calendar is over
+	rung:       int, // promotions so far: 0 is a mall-elf, 1 and up are Head Elf years
+	outcome:    Outcome,
 	neighbours: [NEIGHBOURS]Neighbour,
 	rng:        Rng,
 }
@@ -44,9 +52,9 @@ standing :: proc(g: ^Game) -> int {
 	return g.merit - g.debt / DEBT_PER_STANDING
 }
 
-// The Standing you must hold on a given day.
-nice_line :: proc(day: int) -> f64 {
-	return LINE_BASE + LINE_SLOPE * f64(day)
+// The Standing you must hold on a given day, steeper for each rung climbed.
+nice_line :: proc(day: int, rung := 0) -> f64 {
+	return LINE_BASE + (LINE_SLOPE + RUNG_LINE_SLOPE * f64(rung)) * f64(day)
 }
 
 alive_count :: proc(g: ^Game) -> int {

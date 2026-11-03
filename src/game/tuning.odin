@@ -41,3 +41,9 @@ COAL_EVERY :: 2 // the Coal Collection takes one Naughty every second night
 DEBT_PER_STANDING :: 5 // Standing = Merit - Debt / 5
 LINE_BASE :: 10.0
 LINE_SLOPE :: 1.7 // Nice line on day d = 10 + 1.7 d
+
+// Promotion (the trap): each rung up makes the next year slightly harder. Debt carries over and is the
+// main pressure; the Coin resets to START_COIN if it is lower (a Head Elf signing bonus). Paper-balanced in
+// tools/balance_sim.py: the rung 1 win rate is about half, rung 2 about a fifth, and coal is the only exit.
+RUNG_LINE_SLOPE :: 0.05 // added to LINE_SLOPE per rung
+RUNG_INTEREST :: 0.002 // added to OWN_INTEREST per rung

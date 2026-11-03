@@ -5,15 +5,18 @@ P = dict(days=24, acts=3, neigh=12,
   inf_cost=3, inf_p3=0.60, inf_p5=0.90, inf_merit=6, inf_fail=-3,
   gift_cost=5, gift_merit=2, gift_debt=8, tithe_div=4, cut=0.5,
   start_coin=30, start_debt=30, interest=0.03, minpay=1,
-  store_inc_per_week=1, remove_every=2, line_a=10, line_b=1.7)
-def line(P,d): return P['line_a']+P['line_b']*d   # Nice line on day d
-def run(policy, P, seed):
-    r=random.Random(seed)
+  store_inc_per_week=1, remove_every=2,
+  rung_slope=0.05, rung_price=0, rung_interest=0.002, promo_debt=0, line_a=10, line_b=1.7)
+def line(P,d,rung=0): return P['line_a']+(P['line_b']+P['rung_slope']*rung)*d   # Nice line on day d
+def run(policy, P, seed, carry=None, rung=0, rng=None):
+    r=rng or random.Random(seed)
     merit=0; dirt=0; coin=P['start_coin']; debt=P['start_debt']
     N=[dict(sus=0,debt=0,naughty=False,alive=True) for _ in range(P['neigh'])]
+    if carry:
+        coin,debt,N=carry
     warn=0
     for d in range(1,P['days']+1):
-        price=P['gift_cost']+(d-1)//7*P['store_inc_per_week']
+        price=P['gift_cost']+(d-1)//7*P['store_inc_per_week']+P['rung_price']*rung
         for a in range(P['acts']):
             alive=[n for n in N if n['alive']]
             nice=[n for n in alive if not n['naughty']]
@@ -40,9 +43,23 @@ def run(policy, P, seed):
         if naughty and d%int(P['remove_every'])==0: r.choice(naughty)['alive']=False
         pay=min(coin,P['minpay']); coin-=pay; debt-=pay
         shortfall=P['minpay']-pay; debt+=shortfall
-        debt=int(debt*(1+P['interest']))
+        debt=int(debt*(1+P['interest']+P['rung_interest']*rung))
     standing=merit-debt//5
-    return standing>=line(P,P['days']), standing, merit, debt, sum(n['alive'] for n in N)
+    run.last=(coin,debt,N)
+    return standing>=line(P,P['days'],rung), standing, merit, debt, sum(n['alive'] for n in N)
+def promote(P, state):
+    # A win: Head Elf. The Debt carries and grows, the Coin carries, survivors keep their Debt and grudges,
+    # the removed are replaced by fresh neighbours, and everyone starts the new List as Nice.
+    coin,debt,N=state
+    N=[dict(sus=0,debt=n['debt'],naughty=False,alive=True) if n['alive'] else dict(sus=0,debt=0,naughty=False,alive=True) for n in N]
+    return (max(coin,P['start_coin']),debt+P['promo_debt'],N)
+def years(policy,P,seed,max_years=8):
+    r=random.Random(seed); carry=None; rung=0
+    while rung<max_years:
+        res=run(policy,P,seed,carry,rung,r)
+        if not res[0]: return rung   # rungs climbed before coal
+        carry=promote(P,run.last); rung+=1
+    return rung
 def greedy(d,dirt,coin,price,nice,alive,P):
     if dirt>=5 or (dirt>=3 and d>=1): return 'inform'
     if coin>=price+0 and d<=18 and len(nice)>2: return 'gift' if (d%2==0 or dirt>=3) else 'survey'
@@ -59,3 +76,7 @@ if __name__=='__main__':
         w=sum(x[0] for x in res)/len(res); st=sum(x[1] for x in res)/len(res)
         print(f"{name:9s} win={w:5.1%} avgStanding={st:6.1f} avgMerit={sum(x[2] for x in res)/len(res):6.1f} avgDebt={sum(x[3] for x in res)/len(res):5.1f} alive={sum(x[4] for x in res)/len(res):4.1f}")
     print('line at Eve', line(P,P['days']))
+    for name,pol in [('greedy',greedy),('gifter',gifter)]:
+        ys=[years(pol,P,s) for s in range(1000)]
+        dist=[sum(1 for y in ys if y==k)/len(ys) for k in range(0,6)]
+        print(f"{name:9s} climbs: mean {sum(ys)/len(ys):.2f}; coal at rung 0..5: "+" ".join(f"{d:4.0%}" for d in dist))

@@ -59,7 +59,7 @@ end_day :: proc(g: ^Game) -> Night_Report {
 	r.own_missed = OWN_MIN_PAYMENT - r.own_paid
 	g.debt += r.own_missed
 	before := g.debt
-	g.debt = int(f64(g.debt) * (1 + OWN_INTEREST))
+	g.debt = int(f64(g.debt) * (1 + OWN_INTEREST + RUNG_INTEREST * f64(g.rung)))
 	r.interest = g.debt - before
 
 	if g.day >= DAYS {
