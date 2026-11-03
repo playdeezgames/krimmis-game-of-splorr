@@ -13,7 +13,10 @@ START_DEBT :: 30
 // Surveil
 SURVEIL_CHANCE :: 0.75
 SURVEIL_DIRT :: 2
-NOTICE_LIMIT :: 3 // Suspicion at which a neighbour reports you
+NOTICE_NOSY :: 3 // misses at which a nosy neighbour reports you
+NOTICE_OBLIVIOUS :: 5 // misses at which an oblivious one does
+GRUDGE_STEP :: 1 // a backfired Report leaves the neighbour with this much grudge
+GRUDGE_CAP :: 1 // and a grudge makes them notice you up to this many misses sooner
 NOTICE_PENALTY :: 5 // Merit lost when they do
 
 // Inform
@@ -47,3 +50,11 @@ LINE_SLOPE :: 1.7 // Nice line on day d = 10 + 1.7 d
 // tools/balance_sim.py: the rung 1 win rate is about half, rung 2 about a fifth, and coal is the only exit.
 RUNG_LINE_SLOPE :: 0.05 // added to LINE_SLOPE per rung
 RUNG_INTEREST :: 0.002 // added to OWN_INTEREST per rung
+
+// Night events: at most one a night, never on Krimmis Eve. One roll: audit, then tip-off, then Santa.
+AUDIT_CHANCE :: 0.08 // Management audits: Merit up if your Standing is on pace, down if not
+AUDIT_PASS :: 3
+AUDIT_FAIL :: -3
+TIP_CHANCE :: 0.10 // a neighbour slips you a note
+TIP_DIRT :: 2
+SANTA_CHANCE :: 0.06 // Kris Krinkle is seen on the street; everyone straightens up, one action fewer tomorrow

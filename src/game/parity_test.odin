@@ -9,7 +9,7 @@ import "core:testing"
 // fails after a rules or tuning change, either the rules drifted or the sim needs the same change.
 //
 // Reference values (balance_sim.py, 10000 seeds, rung 0 unless stated):
-//   greedy 0.588, informer 0.321, gifter 0.608, idle 0.000; mean promotions climbed: greedy 0.94, gifter 0.85.
+//   greedy 0.545, informer 0.316, gifter 0.583, idle 0.000; mean promotions climbed: greedy 0.86, gifter 0.81.
 
 @(private = "file")
 Policy :: enum {
@@ -71,7 +71,8 @@ decide :: proc(p: Policy, g: ^Game, nice_count: int) -> Act {
 play_year :: proc(g: ^Game, p: Policy, bot: ^Rng) {
 	nice: [NEIGHBOURS]int
 	for _ in 1 ..= DAYS {
-		for _ in 0 ..< ACTIONS_PER_DAY {
+		acts := g.actions // Kris Krinkle can take one away
+		for _ in 0 ..< acts {
 			count := nice_neighbours(g, &nice)
 			switch decide(p, g, count) {
 			case .None:
@@ -142,9 +143,9 @@ first_year_win_rates_match_the_simulator :: proc(t: ^testing.T) {
 	informer := first_year_win_rate(.Informer, RUNS)
 	gifter := first_year_win_rate(.Gifter, RUNS)
 	log.infof("win rates: greedy %.3f informer %.3f gifter %.3f", greedy, informer, gifter)
-	testing.expect(t, abs(greedy - 0.588) < RATE_TOLERANCE)
-	testing.expect(t, abs(informer - 0.321) < RATE_TOLERANCE)
-	testing.expect(t, abs(gifter - 0.608) < RATE_TOLERANCE)
+	testing.expect(t, abs(greedy - 0.545) < RATE_TOLERANCE)
+	testing.expect(t, abs(informer - 0.316) < RATE_TOLERANCE)
+	testing.expect(t, abs(gifter - 0.583) < RATE_TOLERANCE)
 	testing.expect_value(t, first_year_win_rate(.Idle, 500), 0.0)
 }
 
@@ -154,6 +155,6 @@ promotion_climbs_match_the_simulator :: proc(t: ^testing.T) {
 	greedy := mean_climbs(.Greedy, RUNS)
 	gifter := mean_climbs(.Gifter, RUNS)
 	log.infof("mean climbs: greedy %.3f gifter %.3f", greedy, gifter)
-	testing.expect(t, abs(greedy - 0.935) < CLIMB_TOLERANCE)
-	testing.expect(t, abs(gifter - 0.846) < CLIMB_TOLERANCE)
+	testing.expect(t, abs(greedy - 0.863) < CLIMB_TOLERANCE)
+	testing.expect(t, abs(gifter - 0.814) < CLIMB_TOLERANCE)
 }

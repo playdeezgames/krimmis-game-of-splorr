@@ -95,3 +95,78 @@ a_missed_payment_is_added_to_the_debt :: proc(t: ^testing.T) {
 	testing.expect_value(t, g.debt, 104) // (100 + 1) * 1.03 = 104.03, truncated
 	testing.expect_value(t, g.coin, 0)
 }
+
+// A game whose next night's first draw (the event roll, on an odd day with no Naughty) lands in [lo, hi).
+@(private = "file")
+game_with_event_roll :: proc(lo, hi: f64) -> Game {
+	for seed in u64(1) ..< 100000 {
+		probe := rng_seed(seed)
+		x := rng_float(&probe)
+		if x >= lo && x < hi {
+			return new_game(seed)
+		}
+	}
+	panic("no seed found")
+}
+
+@(test)
+an_audit_rewards_a_pace_and_punishes_a_slump :: proc(t: ^testing.T) {
+	g := game_with_event_roll(0, AUDIT_CHANCE)
+	g.merit = 100
+	r := end_day(&g)
+	testing.expect_value(t, r.event, Night_Event.Audit_Pass)
+	testing.expect_value(t, g.merit, 100 + AUDIT_PASS)
+	g = game_with_event_roll(0, AUDIT_CHANCE)
+	r = end_day(&g)
+	testing.expect_value(t, r.event, Night_Event.Audit_Fail)
+	testing.expect_value(t, g.merit, AUDIT_FAIL)
+}
+
+@(test)
+a_tip_off_gives_dirt :: proc(t: ^testing.T) {
+	g := game_with_event_roll(AUDIT_CHANCE, AUDIT_CHANCE + TIP_CHANCE)
+	r := end_day(&g)
+	testing.expect_value(t, r.event, Night_Event.Tip_Off)
+	testing.expect_value(t, g.dirt, TIP_DIRT)
+}
+
+@(test)
+a_santa_sighting_costs_tomorrows_first_action_only :: proc(t: ^testing.T) {
+	g := game_with_event_roll(AUDIT_CHANCE + TIP_CHANCE, AUDIT_CHANCE + TIP_CHANCE + SANTA_CHANCE)
+	r := end_day(&g)
+	testing.expect_value(t, r.event, Night_Event.Santa)
+	testing.expect_value(t, g.actions, ACTIONS_PER_DAY - 1)
+	// The day after that is back to normal (unless Santa is seen again).
+	g.rng = rng_seed(0) // any quiet roll will do; check the flag was spent
+	testing.expect(t, !g.santa_watching)
+}
+
+@(test)
+a_quiet_night_has_no_event :: proc(t: ^testing.T) {
+	g := game_with_event_roll(AUDIT_CHANCE + TIP_CHANCE + SANTA_CHANCE, 1)
+	r := end_day(&g)
+	testing.expect_value(t, r.event, Night_Event.None)
+	testing.expect_value(t, g.actions, ACTIONS_PER_DAY)
+}
+
+@(test)
+nights_have_the_rolled_event_share :: proc(t: ^testing.T) {
+	counts: [Night_Event]int
+	for seed in u64(1) ..= 3000 {
+		g := new_game(seed)
+		counts[end_day(&g).event] += 1
+	}
+	share :: proc(n: int) -> f64 {return f64(n) / 3000}
+	testing.expect(t, abs(share(counts[.Audit_Pass] + counts[.Audit_Fail]) - AUDIT_CHANCE) < 0.025)
+	testing.expect(t, abs(share(counts[.Tip_Off]) - TIP_CHANCE) < 0.025)
+	testing.expect(t, abs(share(counts[.Santa]) - SANTA_CHANCE) < 0.025)
+}
+
+@(test)
+there_is_no_event_on_krimmis_eve :: proc(t: ^testing.T) {
+	for seed in u64(1) ..= 500 {
+		g := new_game(seed)
+		g.day = DAYS
+		testing.expect_value(t, end_day(&g).event, Night_Event.None)
+	}
+}

@@ -1,6 +1,7 @@
 #+build !js
 package game
 
+import "core:strings"
 import "core:testing"
 
 // Finds a seed whose next draw matches want_chance's outcome, so a rule can be checked exactly.
@@ -44,7 +45,7 @@ surveil_miss_adds_suspicion :: proc(t: ^testing.T) {
 @(test)
 third_miss_is_noticed_and_becomes_a_warning :: proc(t: ^testing.T) {
 	g := game_where_next_draw(SURVEIL_CHANCE, false)
-	g.neighbours[0].suspicion = NOTICE_LIMIT - 1
+	g.neighbours[0].suspicion = notice_limit(&g, 0) - 1
 	e := surveil(&g, 0)
 	testing.expect_value(t, e.kind, Event_Kind.Noticed)
 	testing.expect_value(t, g.warnings, 1)
@@ -146,4 +147,54 @@ actions_run_out_after_three :: proc(t: ^testing.T) {
 	testing.expect_value(t, inform(&g, 4).kind, Event_Kind.No_Actions)
 	g.gifts = 1
 	testing.expect_value(t, gift(&g, 4).kind, Event_Kind.No_Actions)
+}
+
+@(test)
+nosy_and_oblivious_neighbours_notice_at_different_misses :: proc(t: ^testing.T) {
+	g := new_game(1)
+	testing.expect_value(t, notice_limit(&g, 0), NOTICE_NOSY) // Karen
+	testing.expect_value(t, notice_limit(&g, 1), NOTICE_OBLIVIOUS) // Maureen
+}
+
+@(test)
+a_grudge_makes_a_neighbour_notice_one_miss_sooner_and_no_more :: proc(t: ^testing.T) {
+	g := new_game(1)
+	g.neighbours[1].grudge = 1
+	testing.expect_value(t, notice_limit(&g, 1), NOTICE_OBLIVIOUS - 1)
+	g.neighbours[1].grudge = 9
+	testing.expect_value(t, notice_limit(&g, 1), NOTICE_OBLIVIOUS - GRUDGE_CAP)
+}
+
+@(test)
+a_backfired_report_leaves_a_grudge :: proc(t: ^testing.T) {
+	g := game_where_next_draw(INFORM_CHANCE_LOW, false)
+	g.dirt = 3
+	inform(&g, 6)
+	testing.expect_value(t, g.neighbours[6].grudge, GRUDGE_STEP)
+}
+
+@(test)
+the_roster_is_complete_and_balanced :: proc(t: ^testing.T) {
+	nosy := 0
+	for r in ROSTER {
+		if r.trait == .Nosy {
+			nosy += 1
+		}
+		testing.expect(t, len(r.short) > 0 && len(r.short) <= 8)
+		testing.expect(t, len(r.full) > 0 && len(r.label) > 0 && len(r.taste) > 0)
+		testing.expect(t, len(r.surveil) > 0 && len(r.report) > 0 && len(r.removed) > 0)
+		testing.expect(t, len(r.surveil) <= 80 && len(r.report) <= 80 && len(r.removed) <= 80)
+	}
+	testing.expect_value(t, nosy, 6)
+}
+
+@(test)
+no_roster_text_says_the_forbidden_word :: proc(t: ^testing.T) {
+	for r in ROSTER {
+		for text in ([?]string{r.short, r.full, r.label, r.taste, r.surveil, r.report, r.removed}) {
+			lower := strings.to_lower(text, context.temp_allocator)
+			testing.expect(t, !strings.contains(lower, "christmas") && !strings.contains(lower, "xmas"))
+			testing.expect(t, !strings.contains(lower, "hallmark"))
+		}
+	}
 }

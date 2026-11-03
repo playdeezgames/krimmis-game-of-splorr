@@ -3,6 +3,14 @@ package game
 // The night reckoning: tithes come in, your own Debt is paid down and grows, and the Coal Collection
 // calls on a Naughty neighbour. The order matches tools/balance_sim.py.
 
+Night_Event :: enum {
+	None,
+	Audit_Pass, // Management audits you and is pleased
+	Audit_Fail, // ...and is not
+	Tip_Off, // a neighbour slips you a note
+	Santa, // Kris Krinkle was seen: one action fewer tomorrow
+}
+
 Night_Report :: struct {
 	refused:      bool, // the calendar was already over; nothing ran
 	tithe_payers: int, // neighbours who paid a tithe
@@ -12,6 +20,8 @@ Night_Report :: struct {
 	own_missed:   int, // the part of the minimum payment you could not make (added to the Debt)
 	interest:     int, // Debt added by interest
 	eve:          bool, // this was the night of Krimmis Eve
+	event:        Night_Event,
+	event_amount: int, // Merit or Dirt the event gave or took
 }
 
 // Ends the day and runs the reckoning. The night of day DAYS is Krimmis Eve: it runs, the day does not
@@ -65,9 +75,29 @@ end_day :: proc(g: ^Game) -> Night_Report {
 	if g.day >= DAYS {
 		g.eve_reached = true
 		r.eve = true
-	} else {
-		g.day += 1
-		g.actions = ACTIONS_PER_DAY
+		return r
 	}
+
+	// One random event a night, never on Krimmis Eve.
+	x := rng_float(&g.rng)
+	switch {
+	case x < AUDIT_CHANCE:
+		if f64(standing(g)) >= nice_line(g.day, g.rung) {
+			r.event, r.event_amount = .Audit_Pass, AUDIT_PASS
+		} else {
+			r.event, r.event_amount = .Audit_Fail, AUDIT_FAIL
+		}
+		g.merit += r.event_amount
+	case x < AUDIT_CHANCE + TIP_CHANCE:
+		r.event, r.event_amount = .Tip_Off, TIP_DIRT
+		g.dirt += TIP_DIRT
+	case x < AUDIT_CHANCE + TIP_CHANCE + SANTA_CHANCE:
+		r.event = .Santa
+		g.santa_watching = true
+	}
+
+	g.day += 1
+	g.actions = ACTIONS_PER_DAY - (1 if g.santa_watching else 0)
+	g.santa_watching = false
 	return r
 }

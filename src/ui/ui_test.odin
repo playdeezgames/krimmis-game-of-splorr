@@ -1,6 +1,7 @@
 #+build !js
 package ui
 
+import "core:strings"
 import "core:testing"
 import "krimmis:game"
 
@@ -146,7 +147,7 @@ a_naughty_neighbour_is_selectable_but_not_actionable :: proc(t: ^testing.T) {
 	click_rect(&s, house_rect(5))
 	key(&s, .Surveil)
 	testing.expect_value(t, s.g.actions, game.ACTIONS_PER_DAY)
-	testing.expect_value(t, message(&s), "No. 6 is not available.")
+	testing.expect_value(t, message(&s), "Ellen is not available.")
 }
 
 @(test)
@@ -261,7 +262,7 @@ event_log_keeps_the_latest_lines_and_wraps :: proc(t: ^testing.T) {
 	testing.expect_value(t, s.latest, 1)
 	click_rect(&s, house_rect(3))
 	key(&s, .Surveil)
-	testing.expect_value(t, log_line(&s, LOG_VISIBLE - 1), message(&s))
+	testing.expect(t, strings.has_suffix(message(&s), log_line(&s, LOG_VISIBLE - 1))) // a long line wraps
 	testing.expect(t, log_line(&s, LOG_VISIBLE - 2) != "") // the select message sits above it
 	// A long message wraps onto two lines and both are the latest.
 	s.g.neighbours[3].naughty = true
@@ -285,4 +286,44 @@ long_messages_wrap_at_spaces_into_latest_lines :: proc(t: ^testing.T) {
 	testing.expect_value(t, s.latest, 2)
 	testing.expect_value(t, log_line(&s, LOG_VISIBLE - 2), "The Coal Collection took No. 4. Krimmis Eve.")
 	testing.expect_value(t, log_line(&s, LOG_VISIBLE - 1), "Standing short. Coal.")
+}
+
+@(test)
+selecting_a_house_describes_its_neighbour :: proc(t: ^testing.T) {
+	s := new_state(1)
+	click_rect(&s, house_rect(0))
+	testing.expect_value(t, message(&s), "Karen Pemberton-Wise, the Karen. Owes 0. Suspicion 0/3. Likes gift receipts, just in case.")
+	click_rect(&s, house_rect(1))
+	testing.expect_value(t, message(&s), "Maureen Holloway, the choir mum. Owes 0. Suspicion 0/5. Likes sheet music and lozenges.")
+}
+
+@(test)
+houses_are_labelled_with_their_neighbours :: proc(t: ^testing.T) {
+	testing.expect_value(t, name(0), "Karen")
+	testing.expect_value(t, name(11), "Skylar")
+}
+
+@(test)
+a_successful_report_uses_the_neighbours_own_line :: proc(t: ^testing.T) {
+	for seed in u64(1) ..< 200 {
+		s := new_state(seed)
+		s.g.dirt = 5
+		click_rect(&s, house_rect(2))
+		key(&s, .Inform)
+		if s.g.neighbours[2].naughty {
+			testing.expect_value(t, message(&s), "Gary is Naughty. His inflatable snowman is already deflating in sympathy. +6 Merit.")
+			return
+		}
+	}
+	testing.fail_now(t, "no seed informed successfully")
+}
+
+@(test)
+the_coal_collections_visit_reads_the_removed_neighbours_line :: proc(t: ^testing.T) {
+	s := new_state(1)
+	s.g.neighbours[0].naughty = true
+	key(&s, .End_Day)
+	key(&s, .End_Day) // night of day 2
+	testing.expect(t, strings.contains(message(&s), "Karen asked the Coal Collection for their supervisor."))
+	testing.expect(t, strings.contains(message(&s), "Tithes +"))
 }

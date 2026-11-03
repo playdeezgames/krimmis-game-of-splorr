@@ -300,7 +300,8 @@ select :: proc(s: ^State, i: int) {
 	case n.naughty:
 		sayf(s, "%s is Naughty. The Coal Collection is coming.", name(i))
 	case:
-		sayf(s, "%s. Owes %d. Suspicion %d of %d.", name(i), n.debt, n.suspicion, game.NOTICE_LIMIT)
+		r := game.ROSTER[n.role]
+		sayf(s, "%s, %s. Owes %d. Suspicion %d/%d. Likes %s.", r.full, r.label, n.debt, n.suspicion, game.notice_limit(&s.g, i), r.taste)
 	}
 }
 
@@ -321,10 +322,9 @@ move_selection :: proc(s: ^State, delta: int) {
 	select(s, next)
 }
 
-// Names are placeholders until the roster task gives each house a person.
+// The short name of the neighbour in house i: what the house label and the messages call them.
 name :: proc(i: int) -> string {
-	@(static) bufs: [game.NEIGHBOURS][8]u8
-	return fmt.bprintf(bufs[i][:], "No. %d", i + 1)
+	return game.ROSTER[i].short // a house keeps its role even when a new family moves in
 }
 
 perform :: proc(s: ^State, a: Action) {
@@ -376,19 +376,48 @@ describe :: proc(s: ^State, e: game.Event) {
 	case .No_Gifts:
 		say(s, "No gifts in stock. Buy one at the Mall.")
 	case .Surveil_Hit:
-		sayf(s, "Went through %s's bins. +%d Dirt.", who, e.amount)
+		sayf(s, "%s +%d Dirt.", game.ROSTER[s.g.neighbours[e.target].role].surveil, e.amount)
 	case .Surveil_Miss:
 		sayf(s, "%s saw you. Suspicion rises.", who)
 	case .Noticed:
 		sayf(s, "%s reported you! A Warning. %d Merit.", who, e.amount)
 	case .Inform_Success:
-		sayf(s, "Report filed. %s is Naughty. +%d Merit.", who, e.amount)
+		sayf(s, "%s +%d Merit.", game.ROSTER[s.g.neighbours[e.target].role].report, e.amount)
 	case .Inform_Backfire:
 		sayf(s, "Report laughed at. %d Merit.", e.amount)
 	case .Gift_Bought:
 		sayf(s, "Gift bought. -%d Coin. Wrap it, tag it, bill it.", e.amount)
 	case .Gift_Delivered:
 		sayf(s, "%s now owes %d more. +%d Merit.", who, e.amount, game.GIFT_MERIT)
+	}
+}
+
+// What happened in the night, as at most two messages: a random event, then the Coal Collection's visit
+// (or a plain night) with the tithes.
+@(private)
+night_messages :: proc(s: ^State, r: game.Night_Report) {
+	event := ""
+	switch r.event {
+	case .None:
+	case .Audit_Pass:
+		event = fmt.tprintf("Surprise audit! Management is pleased. +%d Merit.", r.event_amount)
+	case .Audit_Fail:
+		event = fmt.tprintf("Surprise audit! Management finds you wanting. %d Merit.", r.event_amount)
+	case .Tip_Off:
+		event = fmt.tprintf("A neighbour slips you a note under the door. +%d Dirt.", r.event_amount)
+	case .Santa:
+		event = "Kris Krinkle was seen on the street. Fewer actions tomorrow."
+	}
+	switch {
+	case r.removed >= 0 && event != "":
+		say(s, event)
+		sayf(s, "%s Tithes +%d.", game.ROSTER[r.removed].removed, r.tithe_coin)
+	case r.removed >= 0:
+		sayf(s, "%s Tithes +%d.", game.ROSTER[r.removed].removed, r.tithe_coin)
+	case event != "":
+		sayf(s, "%s Tithes +%d.", event, r.tithe_coin)
+	case:
+		sayf(s, "Night. Tithes +%d Coin.", r.tithe_coin)
 	}
 }
 
@@ -402,13 +431,13 @@ end_the_day :: proc(s: ^State) {
 	if s.selected >= 0 && !g.neighbours[s.selected].alive {
 		s.selected = -1
 	}
+	if !r.eve {
+		night_messages(s, r)
+		return
+	}
 	taken := ""
 	if r.removed >= 0 {
-		taken = fmt.tprintf(" The Coal Collection took %s.", name(r.removed))
-	}
-	if !r.eve {
-		sayf(s, "Night. Tithes +%d Coin.%s", r.tithe_coin, taken)
-		return
+		taken = fmt.tprintf(" %s was taken.", name(r.removed))
 	}
 	// Capture the reveal before a promotion resets the game for the new year.
 	s.eve = Eve_Report {

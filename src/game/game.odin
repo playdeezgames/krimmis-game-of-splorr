@@ -26,6 +26,7 @@ Game :: struct {
 	coin:       int,
 	debt:       int, // your own Debt to Krimmis Inc.
 	warnings:   int,
+	santa_watching: bool, // Kris Krinkle was seen: one action fewer on the next day
 	eve_reached: bool, // the night of day DAYS has run; the calendar is over
 	rung:       int, // promotions so far: 0 is a mall-elf, 1 and up are Head Elf years
 	outcome:    Outcome,
@@ -65,4 +66,10 @@ alive_count :: proc(g: ^Game) -> int {
 		}
 	}
 	return count
+}
+
+// How many misses a neighbour takes to report you: their trait's limit, one sooner with a grudge.
+notice_limit :: proc(g: ^Game, i: int) -> int {
+	base := NOTICE_NOSY if ROSTER[g.neighbours[i].role].trait == .Nosy else NOTICE_OBLIVIOUS
+	return max(1, base - min(g.neighbours[i].grudge, GRUDGE_CAP))
 }

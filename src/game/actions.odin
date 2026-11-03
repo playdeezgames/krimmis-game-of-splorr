@@ -69,7 +69,7 @@ surveil :: proc(g: ^Game, target: int) -> Event {
 		return Event{kind = .Surveil_Hit, target = target, amount = SURVEIL_DIRT}
 	}
 	n.suspicion += 1
-	if n.suspicion >= NOTICE_LIMIT {
+	if n.suspicion >= notice_limit(g, target) {
 		n.suspicion = 0
 		g.merit -= NOTICE_PENALTY
 		g.warnings += 1
@@ -101,6 +101,7 @@ inform :: proc(g: ^Game, target: int) -> Event {
 		return Event{kind = .Inform_Success, target = target, amount = INFORM_MERIT}
 	}
 	g.merit += INFORM_FAIL_MERIT
+	g.neighbours[target].grudge += GRUDGE_STEP // they remember who accused them
 	return Event{kind = .Inform_Backfire, target = target, amount = INFORM_FAIL_MERIT}
 }
 

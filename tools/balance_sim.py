@@ -6,18 +6,25 @@ P = dict(days=24, acts=3, neigh=12,
   gift_cost=5, gift_merit=2, gift_debt=8, tithe_div=4, cut=0.5,
   start_coin=30, start_debt=30, interest=0.03, minpay=1,
   store_inc_per_week=1, remove_every=2,
-  rung_slope=0.05, rung_price=0, rung_interest=0.002, promo_debt=0, line_a=10, line_b=1.7)
+  rung_slope=0.05, rung_price=0, rung_interest=0.002, promo_debt=0, line_a=10, line_b=1.7,
+  nosy=3, oblivious=5, grudge_step=1, grudge_cap=1,
+  audit_p=0.08, audit_fail=-3, audit_pass=3, tip_p=0.10, tip_dirt=2, santa_p=0.06)
+# The street, in house order. Nosy neighbours notice you sooner; oblivious ones later (see the vault roster).
+NOSY=[True,False,False,True,False,True,False,True,False,True,True,False]
+def fresh(i,P,debt=0,grudge=0):
+    return dict(sus=0,debt=debt,naughty=False,alive=True,lim=P['nosy'] if NOSY[i%12] else P['oblivious'],grudge=grudge)
 def line(P,d,rung=0): return P['line_a']+(P['line_b']+P['rung_slope']*rung)*d   # Nice line on day d
 def run(policy, P, seed, carry=None, rung=0, rng=None):
     r=rng or random.Random(seed)
     merit=0; dirt=0; coin=P['start_coin']; debt=P['start_debt']
-    N=[dict(sus=0,debt=0,naughty=False,alive=True) for _ in range(P['neigh'])]
+    N=[fresh(i,P) for i in range(P['neigh'])]
     if carry:
         coin,debt,N=carry
-    warn=0
+    warn=0; santa=False
     for d in range(1,P['days']+1):
+        acts=P['acts']-(1 if santa else 0); santa=False
         price=P['gift_cost']+(d-1)//7*P['store_inc_per_week']+P['rung_price']*rung
-        for a in range(P['acts']):
+        for a in range(acts):
             alive=[n for n in N if n['alive']]
             nice=[n for n in alive if not n['naughty']]
             act=policy(d,dirt,coin,price,nice,alive,P)
@@ -26,13 +33,13 @@ def run(policy, P, seed, carry=None, rung=0, rng=None):
                 if r.random()<P['surv_p']: dirt+=P['surv_dirt']
                 else:
                     n['sus']+=1
-                    if n['sus']>=P['notice_max']: merit-=P['notice_pen']; warn+=1; n['sus']=0
+                    if n['sus']>=max(1,n['lim']-min(n['grudge'],P['grudge_cap'])): merit-=P['notice_pen']; warn+=1; n['sus']=0
             elif act=='inform' and nice and dirt>=P['inf_cost']:
                 spend=5 if dirt>=5 else 3; dirt-=spend
                 p=P['inf_p5'] if spend==5 else P['inf_p3']
                 n=r.choice(nice)
                 if r.random()<p: merit+=P['inf_merit']; n['naughty']=True
-                else: merit+=P['inf_fail']
+                else: merit+=P['inf_fail']; n['grudge']+=P['grudge_step']
             elif act=='gift' and nice and coin>=price:
                 coin-=price; merit+=P['gift_merit']; r.choice(nice)['debt']+=P['gift_debt']
         # night
@@ -44,6 +51,12 @@ def run(policy, P, seed, carry=None, rung=0, rng=None):
         pay=min(coin,P['minpay']); coin-=pay; debt-=pay
         shortfall=P['minpay']-pay; debt+=shortfall
         debt=int(debt*(1+P['interest']+P['rung_interest']*rung))
+        if d<P['days']:   # one random event a night, never on Krimmis Eve
+            x=r.random()
+            if x<P['audit_p']:
+                merit+=P['audit_pass'] if merit-debt//5>=line(P,d,rung) else P['audit_fail']
+            elif x<P['audit_p']+P['tip_p']: dirt+=P['tip_dirt']
+            elif x<P['audit_p']+P['tip_p']+P['santa_p']: santa=True
     standing=merit-debt//5
     run.last=(coin,debt,N)
     return standing>=line(P,P['days'],rung), standing, merit, debt, sum(n['alive'] for n in N)
@@ -51,7 +64,7 @@ def promote(P, state):
     # A win: Head Elf. The Debt carries and grows, the Coin carries, survivors keep their Debt and grudges,
     # the removed are replaced by fresh neighbours, and everyone starts the new List as Nice.
     coin,debt,N=state
-    N=[dict(sus=0,debt=n['debt'],naughty=False,alive=True) if n['alive'] else dict(sus=0,debt=0,naughty=False,alive=True) for n in N]
+    N=[fresh(i,P,n['debt'],n['grudge']) if n['alive'] else fresh(i,P) for i,n in enumerate(N)]
     return (max(coin,P['start_coin']),debt+P['promo_debt'],N)
 def years(policy,P,seed,max_years=8):
     r=random.Random(seed); carry=None; rung=0
