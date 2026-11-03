@@ -33,13 +33,19 @@ new_game_has_twelve_clean_living_neighbours :: proc(t: ^testing.T) {
 }
 
 @(test)
-calendar_stops_at_krimmis_eve :: proc(t: ^testing.T) {
+calendar_runs_to_krimmis_eve_then_refuses :: proc(t: ^testing.T) {
 	g := new_game(1)
 	for _ in 1 ..< DAYS {
-		testing.expect(t, end_day(&g))
+		r := end_day(&g)
+		testing.expect(t, !r.refused && !r.eve)
 	}
 	testing.expect_value(t, g.day, DAYS)
-	testing.expect(t, !end_day(&g))
+	testing.expect(t, !g.eve_reached)
+	r := end_day(&g) // the night of Krimmis Eve still runs
+	testing.expect(t, r.eve && !r.refused)
+	testing.expect_value(t, g.day, DAYS)
+	testing.expect(t, g.eve_reached)
+	testing.expect(t, end_day(&g).refused)
 }
 
 @(test)

@@ -20,6 +20,7 @@ Game :: struct {
 	coin:       int,
 	debt:       int, // your own Debt to Krimmis Inc.
 	warnings:   int,
+	eve_reached: bool, // the night of day DAYS has run; the calendar is over
 	neighbours: [NEIGHBOURS]Neighbour,
 	rng:        Rng,
 }
@@ -36,16 +37,6 @@ new_game :: proc(seed: u64) -> Game {
 		n = Neighbour{role = i, alive = true}
 	}
 	return g
-}
-
-// Ends the day. Returns false once Krimmis Eve has passed.
-end_day :: proc(g: ^Game) -> bool {
-	if g.day >= DAYS {
-		return false
-	}
-	g.day += 1
-	g.actions = ACTIONS_PER_DAY
-	return true
 }
 
 // Your rank on the Nice List: Merit less a fifth of your Debt.

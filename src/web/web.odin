@@ -28,7 +28,7 @@ platform_day :: proc "c" () -> i32 {
 @(export)
 platform_end_day :: proc "c" () -> bool {
 	context = runtime.default_context()
-	return game.end_day(&g)
+	return !game.end_day(&g).refused
 }
 
 // Placeholder screen that proves the shim: title, calendar, one Urizen tile. Replaced by the scenes task.
