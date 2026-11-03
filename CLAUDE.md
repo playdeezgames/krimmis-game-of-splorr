@@ -44,3 +44,5 @@ This is one of the user's SPLORR!! games. Shared conventions live in the sibling
 - Most SPLORR!! games are Odin compiled to `js_wasm32` (recipe in `Tech/Odin wasm recipe.md`) and default to GitHub Pages. Whether this game uses that stack is not yet decided.
 - "push" means `git push`, "ship" means itch.io. Do neither unless told. Anything an agent posts to itch.io must say it was posted by an AI agent.
 - When this game gets a note in the vault (`Games/<name>.md`, linked from `Home.md`), keep it in step with this repo.
+
+Sprites: `assets/krimmis.world.json` is the Anvil world (tileset `krimmis`, 56 12 px images, palette 0 black, 1 white); `python3 tools/sheet.py` turns it into `assets/krimmis.png` (Urizen layout, 14 tiles a row) and `assets/krimmis.index` (name col row). One shared `removed` tile serves all twelve neighbours; Naughty variants are `<name>_naughty`. Licences are in `assets/LICENSES.md`.

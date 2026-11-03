@@ -1,0 +1,26 @@
+"""Turn the Anvil world assets/krimmis.world.json into assets/krimmis.png and assets/krimmis.index.
+
+The sheet matches the Urizen layout the page already tints: 12 px tiles, 1 px gap, white figures on a black ground.
+The index lists "name col row" per tile, in world order, COLS tiles to a row.
+"""
+import json, os
+from PIL import Image
+
+COLS, T, GAP = 14, 12, 1
+root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets")
+world = json.load(open(os.path.join(root, "krimmis.world.json")))
+palette = [(c["r"], c["g"], c["b"]) for c in world["palette"]]
+images = world["tilesets"][0]["tileset"]["images"]
+rows = -(-len(images) // COLS)
+sheet = Image.new("RGB", (COLS * (T + GAP) - GAP, rows * (T + GAP) - GAP), palette[0])
+index = []
+for n, img in enumerate(images):
+    col, row = n % COLS, n // COLS
+    for i, byte in enumerate(img["bytes"]):
+        for half, idx in enumerate((byte >> 4, byte & 15)):
+            p = i * 2 + half
+            sheet.putpixel((col * (T + GAP) + p % T, row * (T + GAP) + p // T), palette[idx])
+    index.append(f"{img['name']} {col} {row}")
+sheet.save(os.path.join(root, "krimmis.png"))
+open(os.path.join(root, "krimmis.index"), "w").write("\n".join(index) + "\n")
+print(len(images), "tiles,", sheet.size)
