@@ -46,3 +46,5 @@ This is one of the user's SPLORR!! games. Shared conventions live in the sibling
 - When this game gets a note in the vault (`Games/<name>.md`, linked from `Home.md`), keep it in step with this repo.
 
 Sprites: `assets/krimmis.world.json` is the Anvil world (tileset `krimmis`, 56 12 px images, palette 0 black, 1 white); `python3 tools/sheet.py` turns it into `assets/krimmis.png` (Urizen layout, 14 tiles a row) and `assets/krimmis.index` (name col row). One shared `removed` tile serves all twelve neighbours; Naughty variants are `<name>_naughty`. Licences are in `assets/LICENSES.md`.
+
+Sounds: the 17 sounds are PLAY text inside the same Anvil world; wavs in `assets/sfx/` are exports (`sound_export`), and `tools/build.sh` copies them to `build/web/sfx/`. Nothing plays them until task 398.
