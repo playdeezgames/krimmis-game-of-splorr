@@ -23,9 +23,7 @@ PERSON_TILE_ROW :: 0
 draw_frame :: proc(s: ^ui.State) {
 	clear_screen(BLACK)
 	draw_tabs(s)
-	buf: [96]u8
-	draw_text(ui.status_line(s, buf[:]), 4, 20, WHITE)
-	draw_text(ui.standing_line(s, buf[:]), 4, 30, GOLD)
+	draw_hud(s)
 	switch s.place {
 	case .Mall:
 		draw_mall(s)
@@ -35,12 +33,43 @@ draw_frame :: proc(s: ^ui.State) {
 		draw_workshop(s)
 	}
 	draw_buttons(s)
-	draw_message(s)
+	draw_log(s)
 	if s.mode == .Over {
 		fill_rect(40, 90, 240, 50, 0x200000)
 		draw_text_centred("C O A L", 98, RED)
 		draw_text_centred("The List has spoken. Press Enter.", 116, WHITE)
 	}
+}
+
+// Numbers, the 24-door advent calendar and the Standing bar, in three rows under the tabs.
+draw_hud :: proc(s: ^ui.State) {
+	buf: [64]u8
+	draw_text(ui.status_line(s, buf[:]), 4, 20, WHITE)
+
+	// Calendar: 24 doors, 12 px of number in a 13 px pitch.
+	for n in 1 ..= game.DAYS {
+		x := 4 + (n - 1) * 13
+		label: [3]u8
+		text := fmt.bprintf(label[:], "%d", n)
+		switch ui.door(s, n) {
+		case .Opened:
+			draw_text(text, x + (12 - len(text) * GLYPH_W) / 2 + 1, 31, 0x303030)
+		case .Today:
+			fill_rect(i32(x), 29, 12, 11, GOLD)
+			draw_text(text, x + (12 - len(text) * GLYPH_W) / 2 + 1, 31, BLACK)
+		case .Closed:
+			draw_text(text, x + (12 - len(text) * GLYPH_W) / 2 + 1, 31, GREY)
+		}
+	}
+
+	// Standing bar: filled to your Standing, the tick is today's Nice line.
+	bar := ui.standing_bar(s)
+	frame := ui.Rect{4, 43, 220, 9}
+	draw_box(frame, DIM)
+	fill_rect(i32(frame.x + 1), i32(frame.y + 1), i32(f64(frame.w - 2) * bar.fill), i32(frame.h - 2), GREEN if bar.ahead else RED)
+	tick := frame.x + 1 + int(f64(frame.w - 2) * bar.mark)
+	fill_rect(i32(tick), i32(frame.y - 2), 1, i32(frame.h + 4), GOLD)
+	draw_text(ui.standing_text(s, buf[:]), frame.x + frame.w + 6, frame.y + 1, GREEN if bar.ahead else RED)
 }
 
 draw_box :: proc(r: ui.Rect, rgb: i32) {
@@ -71,16 +100,16 @@ draw_mall :: proc(s: ^ui.State) {
 	g := &s.g
 	// Storefronts.
 	for i in 0 ..< 4 {
-		r := ui.Rect{10 + i * 76, 50, 68, 44}
+		r := ui.Rect{10 + i * 76, ui.SCENE_TOP, 68, 44}
 		draw_box(r, DIM)
 		fill_rect(i32(r.x + 1), i32(r.y + 1), i32(r.w - 2), 8, 0x602020 if i % 2 == 0 else 0x206020)
 	}
-	draw_text("Deck Halls", 14, 66, GREY)
-	draw_text("Sweaters", 90, 66, GREY)
-	draw_text("Fruitcake", 166, 66, GREY)
-	draw_text("Tinsel Dept", 242, 66, GREY)
+	draw_text("Deck Halls", 14, ui.SCENE_TOP + 16, GREY)
+	draw_text("Sweaters", 90, ui.SCENE_TOP + 16, GREY)
+	draw_text("Fruitcake", 166, ui.SCENE_TOP + 16, GREY)
+	draw_text("Tinsel Dept", 242, ui.SCENE_TOP + 16, GREY)
 	// The Company Store counter.
-	counter := ui.Rect{10, 104, 150, 62}
+	counter := ui.Rect{10, ui.SCENE_TOP + 52, 150, 62}
 	draw_box(counter, GOLD)
 	draw_text("COMPANY STORE", counter.x + 8, counter.y + 6, GOLD)
 	buf: [48]u8
@@ -88,9 +117,9 @@ draw_mall :: proc(s: ^ui.State) {
 	draw_text(fmt.bprintf(buf[:], "In stock    %d", g.gifts), counter.x + 8, counter.y + 34, WHITE)
 	draw_text("Billed to future you", counter.x + 8, counter.y + 48, DIM)
 	// The mall Santa.
-	put_tile(PERSON_TILE_COL, PERSON_TILE_ROW, 220, 126, RED)
-	draw_text("Mall Santa", 190, 146, RED)
-	draw_text("(queue: 340 children)", 168, 156, DIM)
+	put_tile(PERSON_TILE_COL, PERSON_TILE_ROW, 220, ui.SCENE_TOP + 74, RED)
+	draw_text("Mall Santa", 190, ui.SCENE_TOP + 94, RED)
+	draw_text("(queue: 340 children)", 168, ui.SCENE_TOP + 104, DIM)
 }
 
 draw_neighbourhood :: proc(s: ^ui.State) {
@@ -128,7 +157,7 @@ draw_neighbourhood :: proc(s: ^ui.State) {
 
 draw_workshop :: proc(s: ^ui.State) {
 	g := &s.g
-	desk := ui.Rect{10, 50, 300, 116}
+	desk := ui.Rect{10, ui.SCENE_TOP, 300, 112}
 	draw_box(desk, GREY)
 	draw_text("THE LEDGER", desk.x + 8, desk.y + 8, GOLD)
 	buf: [64]u8
@@ -138,9 +167,9 @@ draw_workshop :: proc(s: ^ui.State) {
 	draw_text(fmt.bprintf(buf[:], "Warnings on file            %d", g.warnings), desk.x + 8, desk.y + 62, WHITE)
 	draw_text(fmt.bprintf(buf[:], "Neighbours left             %d of %d", game.alive_count(g), game.NEIGHBOURS), desk.x + 8, desk.y + 74, WHITE)
 	if g.rung > 0 {
-		draw_text(fmt.bprintf(buf[:], "Head Elf, year %d", g.rung + 1), desk.x + 8, desk.y + 92, GREEN)
+		draw_text(fmt.bprintf(buf[:], "Head Elf, year %d", g.rung + 1), desk.x + 8, desk.y + 88, GREEN)
 	}
-	draw_text("The Coal Collection calls every second night.", desk.x + 8, desk.y + 104, DIM)
+	draw_text("The Coal Collection calls every second night.", desk.x + 8, desk.y + 100, DIM)
 }
 
 draw_buttons :: proc(s: ^ui.State) {
@@ -153,21 +182,11 @@ draw_buttons :: proc(s: ^ui.State) {
 	}
 }
 
-// Up to two lines of 52 characters, split at a space.
-draw_message :: proc(s: ^ui.State) {
-	text := ui.message(s)
-	LINE :: 52
-	if len(text) <= LINE {
-		draw_text(text, 4, 206, WHITE)
-		return
+// The event log: the last few lines, the latest message bright and older ones dimmed.
+draw_log :: proc(s: ^ui.State) {
+	for i in 0 ..< ui.LOG_VISIBLE {
+		line := ui.log_line(s, i)
+		fresh := i >= ui.LOG_VISIBLE - s.latest
+		draw_text(line, 4, 200 + i * 10, WHITE if fresh else DIM)
 	}
-	cut := LINE
-	for cut > 0 && text[cut] != ' ' {
-		cut -= 1
-	}
-	if cut == 0 {
-		cut = LINE
-	}
-	draw_text(text[:cut], 4, 206, WHITE)
-	draw_text(text[cut:] if text[cut] != ' ' else text[cut + 1:], 4, 218, WHITE)
 }

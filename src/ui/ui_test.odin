@@ -189,6 +189,71 @@ a_promotion_starts_the_next_year :: proc(t: ^testing.T) {
 status_lines_show_the_numbers :: proc(t: ^testing.T) {
 	s := new_state(1)
 	buf: [80]u8
-	testing.expect_value(t, status_line(&s, buf[:]), "Day 1/24  Acts 3  Merit 0  Dirt 0  Coin 30  Debt 30")
-	testing.expect_value(t, standing_line(&s, buf[:]), "Standing -6, Nice line 12")
+	testing.expect_value(t, status_line(&s, buf[:]), "Acts 3  Merit 0  Dirt 0  Coin 30  Debt 30  Warn 0")
+	testing.expect_value(t, standing_text(&s, buf[:]), "-6/51")
+	s.g.rung = 1
+	testing.expect_value(t, standing_text(&s, buf[:]), "Y2 -6/52")
+}
+
+@(test)
+standing_bar_follows_standing_and_the_pace :: proc(t: ^testing.T) {
+	s := new_state(1)
+	b := standing_bar(&s)
+	testing.expect_value(t, b.fill, 0.0) // negative Standing clamps to empty
+	testing.expect(t, !b.ahead)
+	testing.expect(t, b.mark > 0 && b.mark < 0.3) // day 1 line is 11.7 of 50.8
+	s.g.merit = 30
+	s.g.debt = 0
+	b = standing_bar(&s)
+	testing.expect(t, abs(b.fill - 30.0 / 50.8) < 0.001)
+	testing.expect(t, b.ahead)
+	s.g.merit = 200
+	testing.expect_value(t, standing_bar(&s).fill, 1.0)
+	s.g.day = game.DAYS
+	testing.expect_value(t, standing_bar(&s).mark, 1.0)
+}
+
+@(test)
+calendar_doors_open_as_days_pass :: proc(t: ^testing.T) {
+	s := new_state(1)
+	testing.expect_value(t, door(&s, 1), Door.Today)
+	testing.expect_value(t, door(&s, 2), Door.Closed)
+	key(&s, .End_Day)
+	key(&s, .End_Day)
+	testing.expect_value(t, door(&s, 1), Door.Opened)
+	testing.expect_value(t, door(&s, 2), Door.Opened)
+	testing.expect_value(t, door(&s, 3), Door.Today)
+	testing.expect_value(t, door(&s, game.DAYS), Door.Closed)
+}
+
+@(test)
+event_log_keeps_the_latest_lines_and_wraps :: proc(t: ^testing.T) {
+	s := new_state(1)
+	testing.expect_value(t, s.latest, 1)
+	click_rect(&s, house_rect(3))
+	key(&s, .Surveil)
+	testing.expect_value(t, log_line(&s, LOG_VISIBLE - 1), message(&s))
+	testing.expect(t, log_line(&s, LOG_VISIBLE - 2) != "") // the select message sits above it
+	// A long message wraps onto two lines and both are the latest.
+	s.g.neighbours[3].naughty = true
+	s.g.neighbours[3].alive = false
+	key(&s, .End_Day)
+	key(&s, .End_Day) // night 2, with a long Coal Collection message at the end of the year below
+	for i in 0 ..< LOG_VISIBLE {
+		testing.expect(t, len(log_line(&s, i)) <= LOG_WIDTH)
+	}
+	s.g.day = game.DAYS
+	s.g.merit = 90
+	key(&s, .End_Day) // promotion: a long line
+	testing.expect(t, s.latest >= 1)
+	testing.expect_value(t, log_line(&s, LOG_VISIBLE - 1) != "", true)
+}
+
+@(test)
+long_messages_wrap_at_spaces_into_latest_lines :: proc(t: ^testing.T) {
+	s := new_state(1)
+	push_log(&s, "The Coal Collection took No. 4. Krimmis Eve. Standing short. Coal.")
+	testing.expect_value(t, s.latest, 2)
+	testing.expect_value(t, log_line(&s, LOG_VISIBLE - 2), "The Coal Collection took No. 4. Krimmis Eve.")
+	testing.expect_value(t, log_line(&s, LOG_VISIBLE - 1), "Standing short. Coal.")
 }

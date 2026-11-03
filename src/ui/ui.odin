@@ -47,6 +47,13 @@ Key :: enum {
 }
 
 MESSAGE_CAP :: 104
+LOG_VISIBLE :: 4 // lines of event log on screen
+LOG_WIDTH :: 52 // characters per line
+
+Log_Line :: struct {
+	text: [LOG_WIDTH]u8,
+	n:    int,
+}
 
 State :: struct {
 	g:        game.Game,
@@ -54,8 +61,10 @@ State :: struct {
 	place:    Place,
 	selected: int, // neighbour index, or -1
 	mode:     Mode,
-	message:  [MESSAGE_CAP]u8,
+	message:  [MESSAGE_CAP]u8, // the latest message, whole
 	msg_len:  int,
+	log:      [LOG_VISIBLE]Log_Line, // the latest messages wrapped into lines, newest at the bottom
+	latest:   int, // how many of the bottom lines belong to the latest message
 }
 
 new_state :: proc(seed: u64) -> State {
@@ -76,11 +85,47 @@ message :: proc(s: ^State) -> string {
 @(private)
 say :: proc(s: ^State, text: string) {
 	s.msg_len = copy(s.message[:], text)
+	push_log(s, string(s.message[:s.msg_len]))
+}
+
+// Adds a message to the event log, wrapping at spaces so a line is at most LOG_WIDTH characters.
+@(private)
+push_log :: proc(s: ^State, text: string) {
+	rest := text
+	s.latest = 0
+	for len(rest) > 0 {
+		cut := len(rest)
+		if cut > LOG_WIDTH {
+			cut = LOG_WIDTH
+			for cut > 0 && rest[cut] != ' ' {
+				cut -= 1
+			}
+			if cut == 0 {
+				cut = LOG_WIDTH
+			}
+		}
+		for i in 0 ..< LOG_VISIBLE - 1 {
+			s.log[i] = s.log[i + 1]
+		}
+		line: Log_Line
+		line.n = copy(line.text[:], rest[:cut])
+		s.log[LOG_VISIBLE - 1] = line
+		s.latest = min(s.latest + 1, LOG_VISIBLE)
+		rest = rest[cut:]
+		for len(rest) > 0 && rest[0] == ' ' {
+			rest = rest[1:]
+		}
+	}
+}
+
+log_line :: proc(s: ^State, i: int) -> string {
+	return string(s.log[i].text[:s.log[i].n])
 }
 
 @(private)
 sayf :: proc(s: ^State, format: string, args: ..any) {
 	s.msg_len = len(fmt.bprintf(s.message[:], format, ..args))
+	push_log(s, string(s.message[:s.msg_len]))
 }
 
 // ---- layout -------------------------------------------------------------------------------------------
@@ -97,6 +142,7 @@ Button :: struct {
 }
 
 MAX_BUTTONS :: 5
+SCENE_TOP :: 58 // the scenes start below the HUD
 HOUSE_COLUMNS :: 6
 
 tab_rect :: proc(p: Place) -> Rect {
@@ -104,7 +150,7 @@ tab_rect :: proc(p: Place) -> Rect {
 }
 
 house_rect :: proc(i: int) -> Rect {
-	return Rect{10 + (i % HOUSE_COLUMNS) * 51, 46 + (i / HOUSE_COLUMNS) * 60, 48, 54}
+	return Rect{10 + (i % HOUSE_COLUMNS) * 51, SCENE_TOP + (i / HOUSE_COLUMNS) * 60, 48, 54}
 }
 
 BUTTON_Y :: 178
@@ -350,14 +396,50 @@ end_the_day :: proc(s: ^State) {
 
 // ---- text the page draws -------------------------------------------------------------------------------
 
-// One line of numbers for the status row.
+// One line of numbers for the first HUD row.
 status_line :: proc(s: ^State, buf: []u8) -> string {
 	g := &s.g
-	return fmt.bprintf(buf, "Day %d/%d  Acts %d  Merit %d  Dirt %d  Coin %d  Debt %d", g.day, game.DAYS, g.actions, g.merit, g.dirt, g.coin, g.debt)
+	return fmt.bprintf(buf, "Acts %d  Merit %d  Dirt %d  Coin %d  Debt %d  Warn %d", g.actions, g.merit, g.dirt, g.coin, g.debt, g.warnings)
 }
 
-// The Nice line against your Standing.
-standing_line :: proc(s: ^State, buf: []u8) -> string {
+// The text beside the Standing bar: Standing over the Eve line, with the year once you are Head Elf.
+standing_text :: proc(s: ^State, buf: []u8) -> string {
 	g := &s.g
-	return fmt.bprintf(buf, "Standing %d, Nice line %.0f", game.standing(g), game.nice_line(g.day, g.rung))
+	eve := game.nice_line(game.DAYS, g.rung)
+	if g.rung > 0 {
+		return fmt.bprintf(buf, "Y%d %d/%.0f", g.rung + 1, game.standing(g), eve)
+	}
+	return fmt.bprintf(buf, "%d/%.0f", game.standing(g), eve)
+}
+
+Bar :: struct {
+	fill:  f64, // your Standing as a share of the Eve line, 0 to 1
+	mark:  f64, // where today's Nice line sits on the same scale, 0 to 1
+	ahead: bool, // Standing is at or above today's line
+}
+
+// The Standing bar. It runs from 0 to the Eve line; the mark is today's line, the pace you must keep.
+standing_bar :: proc(s: ^State) -> Bar {
+	g := &s.g
+	eve := game.nice_line(game.DAYS, g.rung)
+	today := game.nice_line(g.day, g.rung)
+	st := f64(game.standing(g))
+	return Bar{fill = clamp(st / eve, 0, 1), mark = clamp(today / eve, 0, 1), ahead = st >= today}
+}
+
+Door :: enum {
+	Opened, // a day gone
+	Today,
+	Closed, // a day to come
+}
+
+// The advent calendar: door 1 to DAYS.
+door :: proc(s: ^State, number: int) -> Door {
+	switch {
+	case number < s.g.day:
+		return .Opened
+	case number == s.g.day:
+		return .Today
+	}
+	return .Closed
 }
