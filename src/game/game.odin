@@ -16,6 +16,7 @@ Game :: struct {
 	actions:    int, // left today
 	merit:      int,
 	dirt:       int,
+	gifts:      int, // wrapped presents bought and not yet delivered
 	coin:       int,
 	debt:       int, // your own Debt to Krimmis Inc.
 	warnings:   int,
