@@ -15,43 +15,93 @@
 <body>
 	<canvas id="screen" width="320" height="240"></canvas>
 	<footer>
-		Krimmis by TheGrumpyGameDev. Made with an AI agent (Claude Code) at the author's direction.
+		Krimmis by TheGrumpyGameDev. Made with an AI agent (Claude Code) at the author's direction. Font DINOBYTE by mby, https://mby.itch.io/dinobyte, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Tiles Urizen 1-bit by vurmux (CC0).
 		<a href="https://thegrumpygamedev.itch.io/">itch.io</a> · <a href="https://playdeezgames.github.io/oeuvre-of-splorr/">more games</a>
 	</footer>
 	<script src="odin.js"></script>
 	<script>
 	(function () {
 		"use strict";
+		const W = 320, H = 240;
+		const NO_TINT = -1;
 		const screen = document.getElementById("screen");
 		const ctx = screen.getContext("2d");
+		ctx.imageSmoothingEnabled = false;
 		const memory = new odin.WasmMemoryInterface();
 		let ex = null;
+
 		function fit() {
-			let s = Math.min(window.innerWidth / 320, (window.innerHeight - 40) / 240);
+			let s = Math.min(window.innerWidth / W, (window.innerHeight - 90) / H);
 			s = s >= 1 ? Math.floor(s) : Math.max(s, 0.5);
-			screen.style.width = Math.round(320 * s) + "px";
-			screen.style.height = Math.round(240 * s) + "px";
+			screen.style.width = Math.round(W * s) + "px";
+			screen.style.height = Math.round(H * s) + "px";
 		}
 		window.addEventListener("resize", fit);
 		fit();
-		function draw() {
-			ctx.fillStyle = "#000";
-			ctx.fillRect(0, 0, 320, 240);
-			ctx.fillStyle = "#fff";
-			ctx.font = "16px monospace";
-			ctx.fillText("KRIMMIS", 120, 100);
-			ctx.fillText("Day " + ex.platform_day() + " of 24", 112, 130);
+
+		// ---- sheets: Urizen tiles (12 px, 1 px gap, CC0) and DINOBYTE (6 by 8, CP437, CC BY 4.0) ----
+		const sheets = { tiles: new Image(), font: new Image() };
+		sheets.tiles.src = "tileset.png";
+		sheets.font.src = "dbyte_1x.png";
+		const tinted = {}; // "sheet#rrggbb" -> canvas holding the sheet recoloured
+		function tintedSheet(name, rgb) {
+			const key = name + "#" + rgb;
+			let c = tinted[key];
+			if (!c) {
+				const img = sheets[name];
+				c = document.createElement("canvas");
+				c.width = img.width; c.height = img.height;
+				const g = c.getContext("2d");
+				g.drawImage(img, 0, 0);
+				g.globalCompositeOperation = "source-in";
+				g.fillStyle = "#" + (rgb & 0xffffff).toString(16).padStart(6, "0");
+				g.fillRect(0, 0, c.width, c.height);
+				tinted[key] = c;
+			}
+			return c;
 		}
+		function ready(name) { return sheets[name].complete && sheets[name].naturalWidth > 0; }
+		function css(rgb) { return "#" + (rgb & 0xffffff).toString(16).padStart(6, "0"); }
+
+		const host = {
+			clear_screen: rgb => { ctx.fillStyle = css(rgb); ctx.fillRect(0, 0, W, H); },
+			fill_rect: (x, y, w, h, rgb) => { ctx.fillStyle = css(rgb); ctx.fillRect(x, y, w, h); },
+			draw_tile: (col, row, x, y, rgb) => {
+				if (!ready("tiles")) return;
+				const src = rgb === NO_TINT ? sheets.tiles : tintedSheet("tiles", rgb);
+				ctx.drawImage(src, 13 * col + 1, 13 * row + 1, 12, 12, x, y, 12, 12);
+			},
+			draw_glyphs: (ptr, n, x, y, rgb) => {
+				if (!ready("font")) return;
+				const src = rgb === NO_TINT ? sheets.font : tintedSheet("font", rgb);
+				const codes = memory.loadBytes(ptr, n);
+				for (let i = 0; i < n; i++) {
+					const c = codes[i];
+					ctx.drawImage(src, (c % 16) * 6, Math.floor(c / 16) * 8, 6, 8, x + i * 6, y, 6, 8);
+				}
+			},
+		};
+
+		// ---- input ----
 		screen.addEventListener("pointerdown", e => {
 			e.preventDefault();
-			if (ex && ex.platform_end_day()) draw();
+			if (ex) ex.platform_end_day();
 		});
-		function boot() {
-			if (!memory.exports || !memory.exports.platform_day) { requestAnimationFrame(boot); return; }
-			ex = memory.exports;
-			draw();
+
+		// ---- loop ----
+		let last = 0;
+		function frame(t) {
+			const dt = last ? (t - last) / 1000 : 0;
+			last = t;
+			ex.platform_frame(dt);
+			requestAnimationFrame(frame);
 		}
-		odin.runWasm("game.wasm", null, {}, memory);
+		function boot() {
+			if (!memory.exports || !memory.exports.platform_frame) { requestAnimationFrame(boot); return; }
+			ex = memory.exports;
+			requestAnimationFrame(frame);
+		}
+		odin.runWasm("game.wasm", null, { env: host }, memory);
 		boot();
 	})();
 	</script>

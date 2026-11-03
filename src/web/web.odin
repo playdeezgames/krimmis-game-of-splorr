@@ -4,6 +4,7 @@
 package main
 
 import "base:runtime"
+import "core:fmt"
 import "krimmis:game"
 
 g: game.Game
@@ -27,4 +28,17 @@ platform_day :: proc "c" () -> i32 {
 platform_end_day :: proc "c" () -> bool {
 	context = runtime.default_context()
 	return game.end_day(&g)
+}
+
+// Placeholder screen that proves the shim: title, calendar, one Urizen tile. Replaced by the scenes task.
+@(export)
+platform_frame :: proc "c" (dt: f64) {
+	context = runtime.default_context()
+	clear_screen(0x000000)
+	draw_text_centred("K R I M M I S", 90, 0xffffff)
+	buf: [32]u8
+	line := fmt.bprintf(buf[:], "Day %d of %d", g.day, game.DAYS)
+	draw_text_centred(line, 110, 0xc0c0c0)
+	draw_tile(104, 0, (SCREEN_W - TILE) / 2, 130, NO_TINT)
+	draw_text_centred("tap to end the day", 160, 0x808080)
 }
