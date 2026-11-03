@@ -61,6 +61,31 @@ Key :: enum {
 	Confirm,
 }
 
+// Sounds the page plays, as numbers. Keep in step with SOUNDS in web/index.html (same order); each is a wav
+// in assets/sfx. Title_Loop is music: the page plays it while the title screen is up, so it is never queued.
+Sound :: enum {
+	None,
+	Click,
+	Surveil_Hit,
+	Surveil_Miss,
+	Report_Stamp,
+	Report_Backfire,
+	Gift_Wrap,
+	Gift_Delivered,
+	Tithe_Tick,
+	Merit_Up,
+	Debt_Up,
+	Warning,
+	Day_End,
+	Coal_Arrives,
+	Neighbour_Removed,
+	Eve_Fanfare,
+	Coal_Sting,
+	Title_Loop,
+}
+
+SOUND_QUEUE :: 8
+
 MESSAGE_CAP :: 104
 LOG_VISIBLE :: 4 // lines of event log on screen
 LOG_WIDTH :: 52 // characters per line
@@ -82,6 +107,8 @@ State :: struct {
 	latest:   int, // how many of the bottom lines belong to the latest message
 	eve:      Eve_Report,
 	verdict:  game.Outcome, // Coal or Promoted, shown after the reveal
+	sounds:   [SOUND_QUEUE]Sound, // sounds waiting for the page, oldest first
+	sound_n:  int,
 }
 
 new_state :: proc(seed: u64, mode := Mode.Play) -> State {
@@ -94,6 +121,28 @@ new_state :: proc(seed: u64, mode := Mode.Play) -> State {
 	}
 	say(&s, "Welcome to Krimmis, elf. Your name is on the List.")
 	return s
+}
+
+// Queues a sound for the page (dropped if the queue is full).
+@(private)
+play :: proc(s: ^State, snd: Sound) {
+	if s.sound_n < SOUND_QUEUE {
+		s.sounds[s.sound_n] = snd
+		s.sound_n += 1
+	}
+}
+
+// The page takes the oldest waiting sound, or .None.
+next_sound :: proc(s: ^State) -> Sound {
+	if s.sound_n == 0 {
+		return .None
+	}
+	snd := s.sounds[0]
+	for i in 1 ..< s.sound_n {
+		s.sounds[i - 1] = s.sounds[i]
+	}
+	s.sound_n -= 1
+	return snd
 }
 
 message :: proc(s: ^State) -> string {
@@ -217,6 +266,7 @@ click :: proc(s: ^State, x, y: int) {
 	for p in Place {
 		if in_rect(tab_rect(p), x, y) {
 			s.place = p
+			play(s, .Click)
 			return
 		}
 	}
@@ -244,6 +294,10 @@ key :: proc(s: ^State, k: Key) {
 			advance(s)
 		}
 		return
+	}
+	#partial switch k {
+	case .Place_1, .Place_2, .Place_3:
+		play(s, .Click)
 	}
 	switch k {
 	case .None:
@@ -282,8 +336,10 @@ advance :: proc(s: ^State) {
 	switch s.mode {
 	case .Title, .Promotion:
 		s.mode = .Play
+		play(s, .Click)
 	case .Eve:
 		s.mode = .Coal if s.verdict == .Coal else .Promotion
+		play(s, .Coal_Sting if s.verdict == .Coal else .Eve_Fanfare)
 	case .Coal:
 		s^ = new_state(s.seed + 1, .Title) // a fresh run, a fresh seed
 	case .Play:
@@ -292,6 +348,7 @@ advance :: proc(s: ^State) {
 
 @(private)
 select :: proc(s: ^State, i: int) {
+	play(s, .Click)
 	s.selected = i
 	n := s.g.neighbours[i]
 	switch {
@@ -365,6 +422,26 @@ perform :: proc(s: ^State, a: Action) {
 describe :: proc(s: ^State, e: game.Event) {
 	who := name(e.target) if e.target >= 0 else ""
 	#partial switch e.kind {
+	case .No_Actions, .Bad_Target, .Not_Enough_Dirt, .Not_Enough_Coin, .No_Gifts:
+		play(s, .Surveil_Miss) // a refusal: the low blip
+	case .Surveil_Hit:
+		play(s, .Surveil_Hit)
+	case .Surveil_Miss:
+		play(s, .Surveil_Miss)
+	case .Noticed:
+		play(s, .Warning)
+	case .Inform_Success:
+		play(s, .Report_Stamp)
+		play(s, .Merit_Up)
+	case .Inform_Backfire:
+		play(s, .Report_Backfire)
+	case .Gift_Bought:
+		play(s, .Gift_Wrap)
+	case .Gift_Delivered:
+		play(s, .Gift_Delivered)
+		play(s, .Merit_Up)
+	}
+	#partial switch e.kind {
 	case .No_Actions:
 		say(s, "No actions left today. End the day.")
 	case .Bad_Target:
@@ -427,6 +504,23 @@ end_the_day :: proc(s: ^State) {
 	r := game.end_day(g)
 	if r.refused {
 		return
+	}
+	play(s, .Day_End)
+	if r.tithe_coin > 0 {
+		play(s, .Tithe_Tick)
+	}
+	if r.removed >= 0 {
+		play(s, .Coal_Arrives)
+		play(s, .Neighbour_Removed)
+	}
+	if r.own_missed > 0 {
+		play(s, .Debt_Up)
+	}
+	#partial switch r.event {
+	case .Audit_Pass, .Tip_Off:
+		play(s, .Merit_Up)
+	case .Audit_Fail:
+		play(s, .Warning)
 	}
 	if s.selected >= 0 && !g.neighbours[s.selected].alive {
 		s.selected = -1

@@ -44,6 +44,19 @@ platform_qa_mode :: proc "c" (m: i32) {
 	}
 }
 
+// The next sound waiting for the page, as a ui.Sound number (0 for none).
+@(export)
+platform_sound :: proc "c" () -> i32 {
+	context = runtime.default_context()
+	return i32(ui.next_sound(&s))
+}
+
+// The screen showing, as a ui.Mode number: the page plays the title tune while it is the title.
+@(export)
+platform_mode :: proc "c" () -> i32 {
+	return i32(s.mode)
+}
+
 @(export)
 platform_frame :: proc "c" (dt: f64) {
 	context = runtime.default_context()

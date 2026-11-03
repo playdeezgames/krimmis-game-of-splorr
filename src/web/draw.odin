@@ -9,6 +9,7 @@ foreign host {
 	clear_screen :: proc(rgb: i32) ---
 	fill_rect :: proc(x, y, w, h: i32, rgb: i32) ---
 	draw_tile :: proc(col, row, x, y: i32, rgb: i32) ---
+	draw_sprite :: proc(col, row, x, y: i32, scale: i32, rgb: i32) ---
 	draw_glyphs :: proc(text: [^]u8, n: i32, x, y: i32, rgb: i32) ---
 	draw_glyphs_scaled :: proc(text: [^]u8, n: i32, x, y: i32, rgb: i32, scale: i32) ---
 }
@@ -34,6 +35,17 @@ draw_text_centred :: proc(s: string, y: int, rgb: i32) {
 
 put_tile :: proc(col, row, x, y: int, rgb: i32) {
 	draw_tile(i32(col), i32(row), i32(x), i32(y), rgb)
+}
+
+// A tile of the Krimmis sheet (src/web/sprites.odin), whole-number scale.
+put_sprite :: proc(sp: Sprite, x, y: int, rgb: i32, scale := 1) {
+	n := int(sp)
+	draw_sprite(i32(n % SPRITE_COLS), i32(n / SPRITE_COLS), i32(x), i32(y), i32(scale), rgb)
+}
+
+// The portrait of the neighbour whose role is `role` (the sheet holds each one followed by its Naughty variant).
+neighbour_sprite :: proc(role: int, naughty: bool) -> Sprite {
+	return Sprite(int(Sprite.Karen) + 2 * role + (1 if naughty else 0))
 }
 
 // Big text for titles: whole-number scale, so the pixels stay square.

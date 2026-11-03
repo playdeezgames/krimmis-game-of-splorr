@@ -327,3 +327,85 @@ the_coal_collections_visit_reads_the_removed_neighbours_line :: proc(t: ^testing
 	testing.expect(t, strings.contains(message(&s), "Karen asked the Coal Collection for their supervisor."))
 	testing.expect(t, strings.contains(message(&s), "Tithes +"))
 }
+
+drain :: proc(s: ^State) -> [dynamic]Sound {
+	out := make([dynamic]Sound, context.temp_allocator)
+	for snd := next_sound(s); snd != .None; snd = next_sound(s) {
+		append(&out, snd)
+	}
+	return out
+}
+
+@(test)
+sounds_come_out_oldest_first_and_then_none :: proc(t: ^testing.T) {
+	s := new_state(1)
+	click_rect(&s, tab_rect(.Mall))
+	key(&s, .Place_3)
+	got := drain(&s)
+	testing.expect_value(t, len(got), 2)
+	testing.expect_value(t, next_sound(&s), Sound.None)
+}
+
+@(test)
+the_sound_queue_drops_extras_instead_of_overflowing :: proc(t: ^testing.T) {
+	s := new_state(1)
+	for _ in 0 ..< SOUND_QUEUE + 5 {
+		key(&s, .Place_1)
+	}
+	testing.expect_value(t, len(drain(&s)), SOUND_QUEUE)
+}
+
+@(test)
+a_refusal_makes_the_low_blip :: proc(t: ^testing.T) {
+	s := new_state(1)
+	click_rect(&s, house_rect(0))
+	drain(&s)
+	key(&s, .Inform) // no Dirt
+	got := drain(&s)
+	testing.expect_value(t, len(got), 1)
+	testing.expect_value(t, got[0], Sound.Surveil_Miss)
+}
+
+@(test)
+buying_and_gifting_make_their_sounds :: proc(t: ^testing.T) {
+	s := new_state(1)
+	key(&s, .Place_1)
+	key(&s, .Buy)
+	key(&s, .Place_2)
+	click_rect(&s, house_rect(3))
+	drain(&s)
+	key(&s, .Gift)
+	got := drain(&s)
+	testing.expect_value(t, got[0], Sound.Gift_Delivered)
+	testing.expect_value(t, got[1], Sound.Merit_Up)
+}
+
+@(test)
+a_night_with_a_removal_rings_the_coal_bell :: proc(t: ^testing.T) {
+	s := new_state(1)
+	s.g.neighbours[0].naughty = true
+	key(&s, .End_Day)
+	drain(&s)
+	key(&s, .End_Day)
+	got := drain(&s)
+	testing.expect_value(t, got[0], Sound.Day_End)
+	found_bell, found_gone := false, false
+	for snd in got {
+		found_bell ||= snd == .Coal_Arrives
+		found_gone ||= snd == .Neighbour_Removed
+	}
+	testing.expect(t, found_bell && found_gone)
+}
+
+@(test)
+the_verdict_has_its_own_sound :: proc(t: ^testing.T) {
+	s := new_state(1)
+	s.mode = .Eve
+	s.verdict = .Coal
+	click(&s, 0, 0)
+	testing.expect_value(t, drain(&s)[0], Sound.Coal_Sting)
+	s.mode = .Eve
+	s.verdict = .Promoted
+	click(&s, 0, 0)
+	testing.expect_value(t, drain(&s)[0], Sound.Eve_Fanfare)
+}

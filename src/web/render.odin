@@ -1,6 +1,6 @@
 #+build js
-// Draws the menu layer. Placeholder art: Urizen tiles for people and boxes for buildings, until the
-// Anvil sheet lands. Everything is positioned with the layout procs in package ui, so what is drawn is
+// Draws the menu layer: sprites from the Anvil sheet (src/web/sprites.odin) and boxes for buildings, with
+// the Urizen sheet kept for tile dressing. Everything is positioned with the layout procs in package ui, so what is drawn is
 // what is clickable.
 package main
 
@@ -16,9 +16,6 @@ RED :: 0xe04040
 GREEN :: 0x60c060
 GOLD :: 0xe0c040
 CYAN :: 0x60c0e0
-
-PERSON_TILE_COL :: 104 // Urizen: a plain human figure
-PERSON_TILE_ROW :: 0
 
 draw_frame :: proc(s: ^ui.State) {
 	switch s.mode {
@@ -66,7 +63,8 @@ draw_title :: proc() {
 	draw_garland(224)
 	draw_text_big_centred("KRIMMIS", 34, RED, 5)
 	draw_text_centred("The Season of Giving (Giving Up)", 82, GOLD)
-	put_tile(PERSON_TILE_COL, PERSON_TILE_ROW, (SCREEN_W - TILE) / 2, 106, GREEN)
+	put_sprite(.Player, 112, 96, GREEN, 2)
+	put_sprite(.Krimmis, 184, 96, RED, 2)
 	draw_text_centred("Welcome to the Mall, elf. It's your first day", 126, WHITE)
 	draw_text_centred("as Assistant to the Regional Manager of Joy.", 136, WHITE)
 	draw_text_centred("Kris Krinkle is watching. Kris Krinkle", 152, GREY)
@@ -87,8 +85,9 @@ draw_eve :: proc(s: ^ui.State) {
 	draw_text_centred(fmt.bprintf(buf[:], "The Nice line . . . . %.0f", e.line), 116, WHITE)
 	draw_text_centred(fmt.bprintf(buf[:], "Owed to Krimmis Inc.  %d", e.debt), 128, GOLD)
 	draw_text_centred(fmt.bprintf(buf[:], "Neighbours remaining  %d of %d", e.alive, game.NEIGHBOURS), 140, GREY)
-	draw_text_centred("He is ready to read the verdict.", 170, WHITE)
-	draw_text_centred("Click or press Enter", 196, GOLD)
+	put_sprite(.Krimmis, (SCREEN_W - 36) / 2, 150, RED, 3)
+	draw_text_centred("He is ready to read the verdict.", 188, WHITE)
+	draw_text_centred("Click or press Enter", 204, GOLD)
 	draw_garland(224)
 }
 
@@ -98,7 +97,7 @@ draw_coal :: proc(s: ^ui.State) {
 	draw_text_big_centred("COAL", 28, RED, 6)
 	draw_text_centred("You have been moved to the Naughty column.", 84, WHITE)
 	draw_text_centred("The Coal Collection will see you now.", 98, WHITE)
-	put_tile(PERSON_TILE_COL, PERSON_TILE_ROW, (SCREEN_W - TILE) / 2, 120, 0x303030)
+	put_sprite(.Coal_Collection, (SCREEN_W - 36) / 2, 108, 0x909090, 3)
 	draw_text_centred("Your Debt is forgiven (by the Coal Collection).", 146, GREY)
 	draw_text_centred("Merry Krimmis from all of us at Krimmis Inc.", 166, GOLD)
 	draw_text_centred("Click or press Enter to clock in again", 196, WHITE)
@@ -110,6 +109,8 @@ draw_promotion :: proc(s: ^ui.State) {
 	draw_garland(8)
 	draw_text_big_centred("PROMOTED", 24, GOLD, 4)
 	draw_text_centred("HEAD ELF", 64, GREEN)
+	put_sprite(.Head_Elf, 96, 58, GREEN, 2)
+	put_sprite(.Head_Elf, 200, 58, GREEN, 2)
 	draw_text_centred("Congratulations. You are Nice. This is your reward:", 88, WHITE)
 	draw_text_centred("Kris Krinkle hands you next year's List.", 108, WHITE)
 	draw_text_centred("It is longer. Everyone you left on the Nice", 122, GREY)
@@ -182,6 +183,7 @@ draw_mall :: proc(s: ^ui.State) {
 	for i in 0 ..< 4 {
 		r := ui.Rect{10 + i * 76, ui.SCENE_TOP, 68, 44}
 		draw_box(r, DIM)
+		put_sprite(.Storefront, r.x + (r.w - TILE) / 2, r.y + 28, GREY)
 		fill_rect(i32(r.x + 1), i32(r.y + 1), i32(r.w - 2), 8, 0x602020 if i % 2 == 0 else 0x206020)
 	}
 	draw_text("Deck Halls", 14, ui.SCENE_TOP + 16, GREY)
@@ -196,8 +198,12 @@ draw_mall :: proc(s: ^ui.State) {
 	draw_text(fmt.bprintf(buf[:], "Gift price  %d Coin", game.store_price(g.day)), counter.x + 8, counter.y + 22, WHITE)
 	draw_text(fmt.bprintf(buf[:], "In stock    %d", g.gifts), counter.x + 8, counter.y + 34, WHITE)
 	draw_text("Billed to future you", counter.x + 8, counter.y + 48, DIM)
+	put_sprite(.Store_Counter, counter.x + counter.w - 16, counter.y + 24, GOLD)
+	put_sprite(.Gift if g.gifts == 0 else .Gift_Wrapped, counter.x + counter.w - 16, counter.y + 40, WHITE)
 	// The mall Santa.
-	put_tile(PERSON_TILE_COL, PERSON_TILE_ROW, 220, ui.SCENE_TOP + 74, RED)
+	put_sprite(.Throne, 226, ui.SCENE_TOP + 52, RED, 3)
+	put_sprite(.Krimmis, 226, ui.SCENE_TOP + 52, WHITE, 3)
+	put_sprite(.Fountain, 176, ui.SCENE_TOP + 60, CYAN, 2)
 	draw_text("Mall Santa", 190, ui.SCENE_TOP + 94, RED)
 	draw_text("(queue: 340 children)", 168, ui.SCENE_TOP + 104, DIM)
 }
@@ -211,7 +217,8 @@ draw_neighbourhood :: proc(s: ^ui.State) {
 		roof := ui.Rect{r.x, r.y + 4, r.w, 10}
 		if !n.alive {
 			draw_box(body, 0x202020)
-			draw_text("gone", r.x + 12, r.y + 24, DIM)
+			put_sprite(.Removed, r.x + (r.w - TILE) / 2, r.y + 18, DIM)
+			draw_text("gone", r.x + 12, r.y + 32, DIM)
 		} else {
 			colour: i32 = WHITE
 			if n.naughty {
@@ -219,7 +226,7 @@ draw_neighbourhood :: proc(s: ^ui.State) {
 			}
 			fill_rect(i32(roof.x), i32(roof.y), i32(roof.w), i32(roof.h), 0x303060 if !n.naughty else 0x602020)
 			draw_box(body, GREY)
-			put_tile(PERSON_TILE_COL, PERSON_TILE_ROW, r.x + (r.w - TILE) / 2, r.y + 20, colour)
+			put_sprite(neighbour_sprite(n.role, n.naughty), r.x + (r.w - TILE) / 2, r.y + 20, colour)
 			if n.debt > 0 {
 				buf: [8]u8
 				draw_text(fmt.bprintf(buf[:], "d%d", n.debt), r.x + 4, r.y + 32, GOLD)
@@ -250,6 +257,11 @@ draw_workshop :: proc(s: ^ui.State) {
 		draw_text(fmt.bprintf(buf[:], "Head Elf, year %d", g.rung + 1), desk.x + 8, desk.y + 88, GREEN)
 	}
 	draw_text("The Coal Collection calls every second night.", desk.x + 8, desk.y + 100, DIM)
+	put_sprite(.Head_Elf if g.rung > 0 else .Player, desk.x + desk.w - 70, desk.y + 8, GREEN, 2)
+	put_sprite(.Management, desk.x + desk.w - 40, desk.y + 8, GOLD, 2)
+	put_sprite(.Ledger_Desk, desk.x + desk.w - 70, desk.y + 44, WHITE, 2)
+	put_sprite(.Workbench, desk.x + desk.w - 40, desk.y + 44, GREY, 2)
+	put_sprite(.Conveyor, desk.x + desk.w - 40, desk.y + 74, GREY)
 }
 
 draw_buttons :: proc(s: ^ui.State) {
