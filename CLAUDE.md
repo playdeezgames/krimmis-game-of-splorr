@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Odin at `/home/yermom/.local/bin/odin` (override with `ODIN=`). Run from anywhere:
 
 ```bash
-tools/test.sh                     # native tests of src/game
+tools/test.sh                     # native tests of src/game and src/ui
 tools/build.sh                    # js_wasm32 build into build/web (OPT=size for the small build)
 python3 -m http.server -d build/web 8000   # the wasm must be served over http, not file://
 tools/pages.sh                    # test + size build copied into docs/ for GitHub Pages; never commits or pushes
