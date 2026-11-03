@@ -1,0 +1,4 @@
+build/
+/game
+/odin
+__pycache__/

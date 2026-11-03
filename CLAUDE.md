@@ -2,9 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## State of the repository
+## Commands
 
-Pre-production. The repo contains only `README.md`; there is no code, build system, linter or test suite yet, so there are no commands to document. Update this file when the stack and build/run/test commands are chosen.
+Odin at `/home/yermom/.local/bin/odin` (override with `ODIN=`). Run from anywhere:
+
+```bash
+tools/test.sh                     # native tests of src/game
+tools/build.sh                    # js_wasm32 build into build/web (OPT=size for the small build)
+python3 -m http.server -d build/web 8000   # the wasm must be served over http, not file://
+tools/pages.sh                    # test + size build copied into docs/ for GitHub Pages; never commits or pushes
+tools/balance_sim.py              # python3; Monte Carlo of the economy (numbers tuned there, recorded in the vault note)
+```
+
+Run a single test with `odin test src/game -define:ODIN_TEST_THREADS=1 -define:ODIN_TEST_NAMES=game.new_game_starts_on_day_one`. Port 8765 is often taken by another SPLORR!! game's server; check the page title.
+
+## Architecture
+
+Three layers, as in JetLag and the other SPLORR!! web games:
+
+- `src/game` (package `game`): all rules, **no browser imports**, so it builds and tests natively. Test files carry `#+build !js`.
+- `src/web` (package `main`, `#+build js`): the thin wasm layer. It exports `proc "c"` platform functions (`platform_day`, `platform_end_day`, ...) and a `step` that only keeps `odin.js` alive. It imports the game as `krimmis:game` (build passes `-collection:krimmis=src`).
+- `web/index.html`: owns the canvas, input and (later) sound; it calls the exports through `memory.exports`. It carries the release-standard footer (itch.io and more-games back links, AI disclosure). Keep the exported names and any enum values in the page in step with `src/`.
+
+The scaffold only has the calendar (24 days, 3 actions, 12 neighbours); the loop is not built yet. Build the next tasks from Coxswain, in the order the vault note's core loop gives.
 
 ## The project
 
