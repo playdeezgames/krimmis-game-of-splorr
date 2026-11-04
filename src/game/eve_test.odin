@@ -51,12 +51,12 @@ promotion_restarts_the_loop_one_rung_up :: proc(t: ^testing.T) {
 	g.gifts = 2
 	g.warnings = 1
 	g.coin = 3
-	g.neighbours[0].debt = 12
+	g.neighbours[0].obliged = 12
 	g.neighbours[0].grudge = 2
 	g.neighbours[0].suspicion = 2
 	g.neighbours[1].naughty = true
 	g.neighbours[2].alive = false
-	g.neighbours[2].debt = 9
+	g.neighbours[2].obliged = 9
 	g.neighbours[2].naughty = true
 	testing.expect_value(t, resolve_eve(&g), Outcome.Promoted)
 	testing.expect_value(t, g.outcome, Outcome.Playing)
@@ -70,13 +70,13 @@ promotion_restarts_the_loop_one_rung_up :: proc(t: ^testing.T) {
 	testing.expect_value(t, g.debt, 35) // the Debt carries
 	testing.expect_value(t, g.coin, START_COIN) // topped up
 	// A survivor keeps debt and grudge but is Nice again.
-	testing.expect_value(t, g.neighbours[0].debt, 12)
+	testing.expect_value(t, g.neighbours[0].obliged, 12)
 	testing.expect_value(t, g.neighbours[0].grudge, 2)
 	testing.expect_value(t, g.neighbours[0].suspicion, 0)
 	testing.expect(t, !g.neighbours[1].naughty)
 	// A neighbour who was taken is replaced by a fresh family in the same house.
 	testing.expect(t, g.neighbours[2].alive && !g.neighbours[2].naughty)
-	testing.expect_value(t, g.neighbours[2].debt, 0)
+	testing.expect_value(t, g.neighbours[2].obliged, 0)
 	testing.expect_value(t, g.neighbours[2].role, 2)
 	testing.expect_value(t, alive_count(&g), NEIGHBOURS)
 }

@@ -1,8 +1,8 @@
 package game
 
 // What a day's three actions do. Each proc returns an Event describing what happened, for the UI and the
-// sounds, and never prints. A refused action (no actions left, a bad target, not enough Dirt or Coin) costs
-// nothing. Buying presents at the Company Store is free of actions; surveilling, informing and delivering
+// sounds, and never prints. A refused action (no actions left, a bad target, not enough Dirt, a declined card) costs
+// nothing. Buying presents at the Company Store is free of actions (and goes on your card); surveilling, informing and delivering
 // each cost one.
 
 Event_Kind :: enum {
@@ -11,7 +11,7 @@ Event_Kind :: enum {
 	No_Actions,
 	Bad_Target,
 	Not_Enough_Dirt,
-	Not_Enough_Coin,
+	Card_Declined, // the gift would take your Debt past the card limit
 	No_Gifts,
 	// Outcomes.
 	Surveil_Hit,
@@ -26,7 +26,7 @@ Event_Kind :: enum {
 Event :: struct {
 	kind:   Event_Kind,
 	target: int, // neighbour index, or -1
-	amount: int, // Dirt gained, Merit change, Coin spent or Debt added, by kind
+	amount: int, // Dirt gained, Merit change, Debt added to your card or favour created, by kind
 }
 
 // The Company Store price, which creeps up a Coin each week.
@@ -47,10 +47,10 @@ refuse :: proc(kind: Event_Kind, target: int = -1) -> Event {
 
 buy_gift :: proc(g: ^Game) -> Event {
 	price := store_price(g.day)
-	if g.coin < price {
-		return refuse(.Not_Enough_Coin)
+	if g.debt + price > card_limit(g) {
+		return refuse(.Card_Declined)
 	}
-	g.coin -= price
+	g.debt += price // on the Company Store card
 	g.gifts += 1
 	return Event{kind = .Gift_Bought, target = -1, amount = price}
 }
@@ -105,7 +105,7 @@ inform :: proc(g: ^Game, target: int) -> Event {
 	return Event{kind = .Inform_Backfire, target = target, amount = INFORM_FAIL_MERIT}
 }
 
-// Delivers one wrapped present. The recipient takes on Debt (the tithe) and you take the Merit.
+// Delivers one wrapped present. The recipient feels obliged to return the favour and you take the Merit.
 gift :: proc(g: ^Game, target: int) -> Event {
 	if g.actions <= 0 {
 		return refuse(.No_Actions, target)
@@ -119,6 +119,6 @@ gift :: proc(g: ^Game, target: int) -> Event {
 	g.actions -= 1
 	g.gifts -= 1
 	g.merit += GIFT_MERIT
-	g.neighbours[target].debt += GIFT_DEBT
-	return Event{kind = .Gift_Delivered, target = target, amount = GIFT_DEBT}
+	g.neighbours[target].obliged += GIFT_OBLIGATION
+	return Event{kind = .Gift_Delivered, target = target, amount = GIFT_OBLIGATION}
 }

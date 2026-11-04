@@ -11,7 +11,7 @@ Outcome :: enum {
 Neighbour :: struct {
 	role:       int, // index into the roster (the roster task fills these in)
 	suspicion:  int, // how close they are to reporting you
-	debt:       int, // what they owe Krimmis Inc. in tithes
+	obliged:    int, // the favour they feel they owe you, in gifts delivered (returned in Coin each night)
 	naughty:    bool, // on the Naughty List, waiting for the Coal Collection
 	alive:      bool, // false once the Coal Collection has been
 	grudge:     int, // how much they remember being informed on (used by the content task)
@@ -56,6 +56,11 @@ standing :: proc(g: ^Game) -> int {
 // The Standing you must hold on a given day, steeper for each rung climbed.
 nice_line :: proc(day: int, rung := 0) -> f64 {
 	return LINE_BASE + (LINE_SLOPE + RUNG_LINE_SLOPE * f64(rung)) * f64(day)
+}
+
+// The most the Company Store card allows you to owe: raised a little with each promotion.
+card_limit :: proc(g: ^Game) -> int {
+	return CARD_LIMIT + RUNG_CARD_LIMIT * g.rung
 }
 
 alive_count :: proc(g: ^Game) -> int {

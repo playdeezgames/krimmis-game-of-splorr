@@ -106,7 +106,7 @@ buying_in_the_mall_then_gifting_in_the_neighbourhood :: proc(t: ^testing.T) {
 	click_rect(&s, house_rect(4))
 	key(&s, .Gift)
 	testing.expect_value(t, s.g.gifts, 0)
-	testing.expect_value(t, s.g.neighbours[4].debt, game.GIFT_DEBT)
+	testing.expect_value(t, s.g.neighbours[4].obliged, game.GIFT_OBLIGATION)
 	testing.expect_value(t, s.g.merit, game.GIFT_MERIT)
 }
 
@@ -292,9 +292,9 @@ long_messages_wrap_at_spaces_into_latest_lines :: proc(t: ^testing.T) {
 selecting_a_house_describes_its_neighbour :: proc(t: ^testing.T) {
 	s := new_state(1)
 	click_rect(&s, house_rect(0))
-	testing.expect_value(t, message(&s), "Karen Pemberton-Wise, the Karen. Owes 0. Suspicion 0/3. Likes gift receipts, just in case.")
+	testing.expect_value(t, message(&s), "Karen Pemberton-Wise, the Karen. Owes you 0. Suspicion 0/3. Likes gift receipts, just in case.")
 	click_rect(&s, house_rect(1))
-	testing.expect_value(t, message(&s), "Maureen Holloway, the choir mum. Owes 0. Suspicion 0/5. Likes sheet music and lozenges.")
+	testing.expect_value(t, message(&s), "Maureen Holloway, the choir mum. Owes you 0. Suspicion 0/5. Likes sheet music and lozenges.")
 }
 
 @(test)
@@ -325,7 +325,7 @@ the_coal_collections_visit_reads_the_removed_neighbours_line :: proc(t: ^testing
 	key(&s, .End_Day)
 	key(&s, .End_Day) // night of day 2
 	testing.expect(t, strings.contains(message(&s), "Karen asked the Coal Collection for their supervisor."))
-	testing.expect(t, strings.contains(message(&s), "Tithes +"))
+	testing.expect(t, strings.contains(message(&s), "Favours +"))
 }
 
 drain :: proc(s: ^State) -> [dynamic]Sound {

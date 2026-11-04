@@ -1,10 +1,12 @@
-import random, sys
+import math, random, sys
 # Paper-balance simulator for Krimmis. All numbers are the proposal under test.
+# Gifts go on the Company Store card (your own Debt); the recipient feels obliged and returns the favour in Coin
+# over the next nights (the Company Store keeps half); Coin pays the card's minimum payment.
 P = dict(days=24, acts=3, neigh=12,
   surv_p=0.75, surv_dirt=2, notice_max=3, notice_pen=5,
   inf_cost=3, inf_p3=0.60, inf_p5=0.90, inf_merit=6, inf_fail=-3,
-  gift_cost=5, gift_merit=2, gift_debt=8, tithe_div=4, cut=0.5,
-  start_coin=30, start_debt=30, interest=0.03, minpay=1,
+  gift_cost=5, gift_merit=2, gift_debt=12, tithe_div=4, cut=0.5,
+  start_coin=30, start_debt=30, interest=0.03, minpay=1, min_rate=0.05, card_limit=50, rung_limit=40,
   store_inc_per_week=1, remove_every=2,
   rung_slope=0.05, rung_price=0, rung_interest=0.002, promo_debt=0, line_a=10, line_b=1.7,
   nosy=3, oblivious=5, grudge_step=1, grudge_cap=1,
@@ -27,7 +29,8 @@ def run(policy, P, seed, carry=None, rung=0, rng=None):
         for a in range(acts):
             alive=[n for n in N if n['alive']]
             nice=[n for n in alive if not n['naughty']]
-            act=policy(d,dirt,coin,price,nice,alive,P)
+            limit=P['card_limit']+P['rung_limit']*rung
+            act=policy(d,dirt,debt+price<=limit,price,nice,alive,P)
             if act=='survey' and nice:
                 n=min(nice,key=lambda x:x['sus'])
                 if r.random()<P['surv_p']: dirt+=P['surv_dirt']
@@ -40,16 +43,17 @@ def run(policy, P, seed, carry=None, rung=0, rng=None):
                 n=r.choice(nice)
                 if r.random()<p: merit+=P['inf_merit']; n['naughty']=True
                 else: merit+=P['inf_fail']; n['grudge']+=P['grudge_step']
-            elif act=='gift' and nice and coin>=price:
-                coin-=price; merit+=P['gift_merit']; r.choice(nice)['debt']+=P['gift_debt']
+            elif act=='gift' and nice and debt+price<=limit:
+                debt+=price; merit+=P['gift_merit']; r.choice(nice)['debt']+=P['gift_debt']
         # night
         for n in alive:
             if n['debt']>0:
                 pay=min(n['debt'],-(-n['debt']//P['tithe_div'])); n['debt']-=pay; coin+=int(pay*P['cut'])
         naughty=[n for n in N if n['alive'] and n['naughty']]
         if naughty and d%int(P['remove_every'])==0: r.choice(naughty)['alive']=False
-        pay=min(coin,P['minpay']); coin-=pay; debt-=pay
-        shortfall=P['minpay']-pay; debt+=shortfall
+        due=max(P['minpay'],math.ceil(debt*P['min_rate']))
+        pay=min(coin,due); coin-=pay; debt-=pay
+        shortfall=due-pay; debt+=shortfall
         debt=int(debt*(1+P['interest']+P['rung_interest']*rung))
         if d<P['days']:   # one random event a night, never on Krimmis Eve
             x=r.random()
@@ -73,15 +77,15 @@ def years(policy,P,seed,max_years=8):
         if not res[0]: return rung   # rungs climbed before coal
         carry=promote(P,run.last); rung+=1
     return rung
-def greedy(d,dirt,coin,price,nice,alive,P):
+def greedy(d,dirt,afford,price,nice,alive,P):
     if dirt>=5 or (dirt>=3 and d>=1): return 'inform'
-    if coin>=price+0 and d<=18 and len(nice)>2: return 'gift' if (d%2==0 or dirt>=3) else 'survey'
+    if afford and d<=18 and len(nice)>2: return 'gift' if (d%2==0 or dirt>=3) else 'survey'
     return 'survey'
-def informer(d,dirt,coin,price,nice,alive,P):
+def informer(d,dirt,afford,price,nice,alive,P):
     return 'inform' if dirt>=3 else 'survey'
-def gifter(d,dirt,coin,price,nice,alive,P):
-    return 'gift' if coin>=price else ('inform' if dirt>=3 else 'survey')
-def idle(d,dirt,coin,price,nice,alive,P): return 'none'
+def gifter(d,dirt,afford,price,nice,alive,P):
+    return 'gift' if afford else ('inform' if dirt>=3 else 'survey')
+def idle(d,dirt,afford,price,nice,alive,P): return 'none'
 if __name__=='__main__':
     for k,v in [a.split('=') for a in sys.argv[1:]]: P[k]=float(v)
     for name,pol in [('greedy',greedy),('informer',informer),('gifter',gifter),('idle',idle)]:

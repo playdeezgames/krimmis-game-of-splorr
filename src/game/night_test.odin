@@ -13,29 +13,29 @@ ending_a_day_moves_on_and_refills_actions :: proc(t: ^testing.T) {
 }
 
 @(test)
-tithe_is_a_quarter_rounded_up_and_you_keep_half :: proc(t: ^testing.T) {
+favour_is_a_quarter_rounded_up_and_you_keep_half :: proc(t: ^testing.T) {
 	g := new_game(1)
-	g.neighbours[0].debt = 8
-	g.neighbours[1].debt = 1
-	g.neighbours[2].debt = 17
+	g.neighbours[0].obliged = 8
+	g.neighbours[1].obliged = 1
+	g.neighbours[2].obliged = 17
 	start := g.coin
 	r := end_day(&g)
-	testing.expect_value(t, g.neighbours[0].debt, 6) // paid 2, you kept 1
-	testing.expect_value(t, g.neighbours[1].debt, 0) // paid 1, you kept 0
-	testing.expect_value(t, g.neighbours[2].debt, 12) // paid 5, you kept 2
-	testing.expect_value(t, r.tithe_payers, 3)
-	testing.expect_value(t, r.tithe_coin, 3)
-	testing.expect_value(t, g.coin, start + 3 - OWN_MIN_PAYMENT)
+	testing.expect_value(t, g.neighbours[0].obliged, 6) // paid 2, you kept 1
+	testing.expect_value(t, g.neighbours[1].obliged, 0) // paid 1, you kept 0
+	testing.expect_value(t, g.neighbours[2].obliged, 12) // paid 5, you kept 2
+	testing.expect_value(t, r.returners, 3)
+	testing.expect_value(t, r.favour_coin, 3)
+	testing.expect_value(t, g.coin, start + 3 - 2) // the card minimum on a Debt of 30 is 2
 }
 
 @(test)
 removed_neighbours_pay_nothing :: proc(t: ^testing.T) {
 	g := new_game(1)
-	g.neighbours[0].debt = 8
+	g.neighbours[0].obliged = 8
 	g.neighbours[0].alive = false
 	r := end_day(&g)
-	testing.expect_value(t, r.tithe_payers, 0)
-	testing.expect_value(t, g.neighbours[0].debt, 8)
+	testing.expect_value(t, r.returners, 0)
+	testing.expect_value(t, g.neighbours[0].obliged, 8)
 }
 
 @(test)
@@ -72,15 +72,15 @@ coal_never_takes_the_already_removed :: proc(t: ^testing.T) {
 }
 
 @(test)
-own_debt_takes_the_minimum_payment_then_interest :: proc(t: ^testing.T) {
+own_debt_takes_the_card_minimum_then_interest :: proc(t: ^testing.T) {
 	g := new_game(1)
 	g.coin = 10
 	g.debt = 100
 	r := end_day(&g)
-	testing.expect_value(t, r.own_paid, OWN_MIN_PAYMENT)
+	testing.expect_value(t, r.own_paid, 5) // a twentieth of 100
 	testing.expect_value(t, r.own_missed, 0)
-	testing.expect_value(t, g.coin, 9)
-	testing.expect_value(t, g.debt, 101) // (100 - 1) * 1.03 = 101.97, truncated
+	testing.expect_value(t, g.coin, 5)
+	testing.expect_value(t, g.debt, 97) // (100 - 5) * 1.03 = 97.85, truncated
 	testing.expect_value(t, r.interest, 2)
 }
 
@@ -91,8 +91,8 @@ a_missed_payment_is_added_to_the_debt :: proc(t: ^testing.T) {
 	g.debt = 100
 	r := end_day(&g)
 	testing.expect_value(t, r.own_paid, 0)
-	testing.expect_value(t, r.own_missed, OWN_MIN_PAYMENT)
-	testing.expect_value(t, g.debt, 104) // (100 + 1) * 1.03 = 104.03, truncated
+	testing.expect_value(t, r.own_missed, 5)
+	testing.expect_value(t, g.debt, 108) // (100 + 5) * 1.03 = 108.15, truncated
 	testing.expect_value(t, g.coin, 0)
 }
 

@@ -114,10 +114,11 @@ draw_promotion :: proc(s: ^ui.State) {
 	draw_text_centred("Congratulations. You are Nice. This is your reward:", 88, WHITE)
 	draw_text_centred("Kris Krinkle hands you next year's List.", 108, WHITE)
 	draw_text_centred("It is longer. Everyone you left on the Nice", 122, GREY)
-	draw_text_centred("List will owe us next year. So will you.", 132, GREY)
+	draw_text_centred("List is next year's customer. So are you.", 132, GREY)
 	buf: [64]u8
-	draw_text_centred(fmt.bprintf(buf[:], "Year %d begins. Same Debt, higher quota.", s.g.rung + 1), 156, GOLD)
-	draw_text_centred("New families have moved in. Please welcome them.", 168, GREY)
+	draw_text_centred(fmt.bprintf(buf[:], "Year %d begins. Same Debt, higher quota.", s.g.rung + 1), 150, GOLD)
+	draw_text_centred("Your credit limit has been raised!", 162, GREY)
+	draw_text_centred("New families have moved in. Please welcome them.", 174, GREY)
 	draw_text_centred("Click or press Enter to accept", 196, WHITE)
 	draw_garland(224)
 }
@@ -195,9 +196,9 @@ draw_mall :: proc(s: ^ui.State) {
 	draw_box(counter, GOLD)
 	draw_text("COMPANY STORE", counter.x + 8, counter.y + 6, GOLD)
 	buf: [48]u8
-	draw_text(fmt.bprintf(buf[:], "Gift price  %d Coin", game.store_price(g.day)), counter.x + 8, counter.y + 22, WHITE)
+	draw_text(fmt.bprintf(buf[:], "Price  %d, on card", game.store_price(g.day)), counter.x + 8, counter.y + 22, WHITE)
 	draw_text(fmt.bprintf(buf[:], "In stock    %d", g.gifts), counter.x + 8, counter.y + 34, WHITE)
-	draw_text("Billed to future you", counter.x + 8, counter.y + 48, DIM)
+	draw_text(fmt.bprintf(buf[:], "Card  %d of %d", g.debt, game.card_limit(g)), counter.x + 8, counter.y + 48, DIM)
 	put_sprite(.Store_Counter, counter.x + counter.w - 16, counter.y + 24, GOLD)
 	put_sprite(.Gift if g.gifts == 0 else .Gift_Wrapped, counter.x + counter.w - 16, counter.y + 40, WHITE)
 	// The mall Santa.
@@ -227,9 +228,9 @@ draw_neighbourhood :: proc(s: ^ui.State) {
 			fill_rect(i32(roof.x), i32(roof.y), i32(roof.w), i32(roof.h), 0x303060 if !n.naughty else 0x602020)
 			draw_box(body, GREY)
 			put_sprite(neighbour_sprite(n.role, n.naughty), r.x + (r.w - TILE) / 2, r.y + 20, colour)
-			if n.debt > 0 {
+			if n.obliged > 0 {
 				buf: [8]u8
-				draw_text(fmt.bprintf(buf[:], "d%d", n.debt), r.x + 4, r.y + 32, GOLD)
+				draw_text(fmt.bprintf(buf[:], "+%d", n.obliged), r.x + 4, r.y + 32, GOLD)
 			}
 			for k in 0 ..< n.suspicion {
 				fill_rect(i32(r.x + r.w - 8 - k * 5), i32(r.y + 32), 3, 3, CYAN)
@@ -248,7 +249,7 @@ draw_workshop :: proc(s: ^ui.State) {
 	draw_box(desk, GREY)
 	draw_text("THE LEDGER", desk.x + 8, desk.y + 8, GOLD)
 	buf: [64]u8
-	draw_text(fmt.bprintf(buf[:], "You owe Krimmis Inc.        %d", g.debt), desk.x + 8, desk.y + 26, WHITE)
+	draw_text(fmt.bprintf(buf[:], "You owe Krimmis Inc.   %d of %d", g.debt, game.card_limit(g)), desk.x + 8, desk.y + 26, WHITE)
 	draw_text(fmt.bprintf(buf[:], "Interest, each night        %.1f%%", 100 * (game.OWN_INTEREST + game.RUNG_INTEREST * f64(g.rung))), desk.x + 8, desk.y + 38, WHITE)
 	draw_text(fmt.bprintf(buf[:], "Gifts wrapped, in stock     %d", g.gifts), desk.x + 8, desk.y + 50, WHITE)
 	draw_text(fmt.bprintf(buf[:], "Warnings on file            %d", g.warnings), desk.x + 8, desk.y + 62, WHITE)

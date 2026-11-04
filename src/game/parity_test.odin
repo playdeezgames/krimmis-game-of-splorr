@@ -9,7 +9,7 @@ import "core:testing"
 // fails after a rules or tuning change, either the rules drifted or the sim needs the same change.
 //
 // Reference values (balance_sim.py, 10000 seeds, rung 0 unless stated):
-//   greedy 0.545, informer 0.316, gifter 0.583, idle 0.000; mean promotions climbed: greedy 0.86, gifter 0.81.
+//   greedy 0.532, informer 0.357, gifter 0.555, idle 0.000; mean promotions climbed: greedy 0.77, gifter 0.71.
 
 @(private = "file")
 Policy :: enum {
@@ -42,14 +42,14 @@ nice_neighbours :: proc(g: ^Game, out: ^[NEIGHBOURS]int) -> int {
 
 @(private = "file")
 decide :: proc(p: Policy, g: ^Game, nice_count: int) -> Act {
-	price := store_price(g.day)
+	afford := g.debt + store_price(g.day) <= card_limit(g) // the Store would not decline the card
 	switch p {
 	case .Idle:
 		return .None
 	case .Informer:
 		return .Inform if g.dirt >= INFORM_COST_LOW else .Surveil
 	case .Gifter:
-		if g.coin >= price {
+		if afford {
 			return .Gift
 		}
 		return .Inform if g.dirt >= INFORM_COST_LOW else .Surveil
@@ -57,7 +57,7 @@ decide :: proc(p: Policy, g: ^Game, nice_count: int) -> Act {
 		if g.dirt >= INFORM_COST_LOW {
 			return .Inform
 		}
-		if g.coin >= price && g.day <= 18 && nice_count > 2 {
+		if afford && g.day <= 18 && nice_count > 2 {
 			return .Gift if g.day % 2 == 0 else .Surveil
 		}
 		return .Surveil
@@ -143,9 +143,9 @@ first_year_win_rates_match_the_simulator :: proc(t: ^testing.T) {
 	informer := first_year_win_rate(.Informer, RUNS)
 	gifter := first_year_win_rate(.Gifter, RUNS)
 	log.infof("win rates: greedy %.3f informer %.3f gifter %.3f", greedy, informer, gifter)
-	testing.expect(t, abs(greedy - 0.545) < RATE_TOLERANCE)
-	testing.expect(t, abs(informer - 0.316) < RATE_TOLERANCE)
-	testing.expect(t, abs(gifter - 0.583) < RATE_TOLERANCE)
+	testing.expect(t, abs(greedy - 0.532) < RATE_TOLERANCE)
+	testing.expect(t, abs(informer - 0.357) < RATE_TOLERANCE)
+	testing.expect(t, abs(gifter - 0.555) < RATE_TOLERANCE)
 	testing.expect_value(t, first_year_win_rate(.Idle, 500), 0.0)
 }
 
@@ -155,6 +155,6 @@ promotion_climbs_match_the_simulator :: proc(t: ^testing.T) {
 	greedy := mean_climbs(.Greedy, RUNS)
 	gifter := mean_climbs(.Gifter, RUNS)
 	log.infof("mean climbs: greedy %.3f gifter %.3f", greedy, gifter)
-	testing.expect(t, abs(greedy - 0.863) < CLIMB_TOLERANCE)
-	testing.expect(t, abs(gifter - 0.814) < CLIMB_TOLERANCE)
+	testing.expect(t, abs(greedy - 0.769) < CLIMB_TOLERANCE)
+	testing.expect(t, abs(gifter - 0.709) < CLIMB_TOLERANCE)
 }

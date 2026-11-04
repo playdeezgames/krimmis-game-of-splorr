@@ -107,13 +107,14 @@ buying_is_free_of_actions_and_gifting_is_not :: proc(t: ^testing.T) {
 	g := new_game(1)
 	e := buy_gift(&g)
 	testing.expect_value(t, e.kind, Event_Kind.Gift_Bought)
-	testing.expect_value(t, g.coin, START_COIN - GIFT_PRICE)
+	testing.expect_value(t, g.debt, START_DEBT + GIFT_PRICE) // on the card
+	testing.expect_value(t, g.coin, START_COIN)
 	testing.expect_value(t, g.gifts, 1)
 	testing.expect_value(t, g.actions, ACTIONS_PER_DAY)
 	e = gift(&g, 2)
 	testing.expect_value(t, e.kind, Event_Kind.Gift_Delivered)
 	testing.expect_value(t, g.merit, GIFT_MERIT)
-	testing.expect_value(t, g.neighbours[2].debt, GIFT_DEBT)
+	testing.expect_value(t, g.neighbours[2].obliged, GIFT_OBLIGATION)
 	testing.expect_value(t, g.gifts, 0)
 	testing.expect_value(t, g.actions, ACTIONS_PER_DAY - 1)
 }
@@ -125,8 +126,9 @@ refusals_cost_nothing :: proc(t: ^testing.T) {
 	testing.expect_value(t, inform(&g, 0).kind, Event_Kind.Not_Enough_Dirt)
 	testing.expect_value(t, surveil(&g, 99).kind, Event_Kind.Bad_Target)
 	testing.expect_value(t, surveil(&g, -1).kind, Event_Kind.Bad_Target)
-	g.coin = 0
-	testing.expect_value(t, buy_gift(&g).kind, Event_Kind.Not_Enough_Coin)
+	g.debt = card_limit(&g) - 1
+	testing.expect_value(t, buy_gift(&g).kind, Event_Kind.Card_Declined)
+	testing.expect_value(t, g.debt, card_limit(&g) - 1)
 	g.neighbours[1].naughty = true
 	g.neighbours[2].alive = false
 	testing.expect_value(t, surveil(&g, 1).kind, Event_Kind.Bad_Target)
@@ -197,4 +199,22 @@ no_roster_text_says_the_forbidden_word :: proc(t: ^testing.T) {
 			testing.expect(t, !strings.contains(lower, "hallmark"))
 		}
 	}
+}
+
+@(test)
+the_card_limit_rises_with_each_promotion :: proc(t: ^testing.T) {
+	g := new_game(1)
+	testing.expect_value(t, card_limit(&g), CARD_LIMIT)
+	g.rung = 2
+	testing.expect_value(t, card_limit(&g), CARD_LIMIT + 2 * RUNG_CARD_LIMIT)
+}
+
+@(test)
+a_gift_that_fits_under_the_limit_is_charged_to_the_card :: proc(t: ^testing.T) {
+	g := new_game(1)
+	g.debt = card_limit(&g) - store_price(g.day) // exactly at the limit afterwards
+	testing.expect_value(t, buy_gift(&g).kind, Event_Kind.Gift_Bought)
+	testing.expect_value(t, g.debt, card_limit(&g))
+	testing.expect_value(t, buy_gift(&g).kind, Event_Kind.Card_Declined)
+	testing.expect_value(t, g.gifts, 1)
 }

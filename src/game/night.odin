@@ -1,7 +1,9 @@
 package game
 
-// The night reckoning: tithes come in, your own Debt is paid down and grows, and the Coal Collection
-// calls on a Naughty neighbour. The order matches tools/balance_sim.py.
+import "core:math"
+
+// The night reckoning: obliged neighbours return their favours, your own Debt is paid down and grows, and the
+// Coal Collection calls on a Naughty neighbour. The order matches tools/balance_sim.py.
 
 Night_Event :: enum {
 	None,
@@ -13,11 +15,11 @@ Night_Event :: enum {
 
 Night_Report :: struct {
 	refused:      bool, // the calendar was already over; nothing ran
-	tithe_payers: int, // neighbours who paid a tithe
-	tithe_coin:   int, // Coin you kept from the tithes
+	returners:     int, // neighbours who returned a favour
+	favour_coin:   int, // Coin you kept from the favours returned
 	removed:      int, // neighbour taken by the Coal Collection, or -1
 	own_paid:     int, // Coin you paid on your own Debt
-	own_missed:   int, // the part of the minimum payment you could not make (added to the Debt)
+	own_missed:   int, // the part of the card minimum you could not make (added to the Debt)
 	interest:     int, // Debt added by interest
 	eve:          bool, // this was the night of Krimmis Eve
 	event:        Night_Event,
@@ -32,17 +34,17 @@ end_day :: proc(g: ^Game) -> Night_Report {
 	}
 	r := Night_Report{removed = -1}
 
-	// Tithes: each living, indebted neighbour pays a quarter of their Debt, rounded up. You keep half.
+	// Favours: each living, obliged neighbour returns a quarter of what they feel they owe, rounded up. You keep half.
 	for &n in g.neighbours {
-		if !n.alive || n.debt <= 0 {
+		if !n.alive || n.obliged <= 0 {
 			continue
 		}
-		pay := min(n.debt, (n.debt + TITHE_DIVISOR - 1) / TITHE_DIVISOR)
-		n.debt -= pay
-		kept := int(f64(pay) * TITHE_CUT)
+		pay := min(n.obliged, (n.obliged + RETURN_DIVISOR - 1) / RETURN_DIVISOR)
+		n.obliged -= pay
+		kept := int(f64(pay) * RETURN_CUT)
 		g.coin += kept
-		r.tithe_coin += kept
-		r.tithe_payers += 1
+		r.favour_coin += kept
+		r.returners += 1
 	}
 
 	// The Coal Collection, every second night, takes one Naughty neighbour at random.
@@ -62,11 +64,12 @@ end_day :: proc(g: ^Game) -> Night_Report {
 		}
 	}
 
-	// Your own Debt: the minimum payment (what you cannot pay is added), then interest.
-	r.own_paid = min(g.coin, OWN_MIN_PAYMENT)
+	// Your own Debt: the card minimum (what you cannot pay is added), then interest.
+	due := max(OWN_MIN_PAYMENT, int(math.ceil(f64(g.debt) * OWN_MIN_RATE)))
+	r.own_paid = min(g.coin, due)
 	g.coin -= r.own_paid
 	g.debt -= r.own_paid
-	r.own_missed = OWN_MIN_PAYMENT - r.own_paid
+	r.own_missed = due - r.own_paid
 	g.debt += r.own_missed
 	before := g.debt
 	g.debt = int(f64(g.debt) * (1 + OWN_INTEREST + RUNG_INTEREST * f64(g.rung)))

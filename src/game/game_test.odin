@@ -28,7 +28,7 @@ new_game_has_twelve_clean_living_neighbours :: proc(t: ^testing.T) {
 		testing.expect_value(t, n.role, i)
 		testing.expect(t, n.alive && !n.naughty)
 		testing.expect_value(t, n.suspicion, 0)
-		testing.expect_value(t, n.debt, 0)
+		testing.expect_value(t, n.obliged, 0)
 	}
 }
 

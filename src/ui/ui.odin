@@ -243,7 +243,7 @@ buttons :: proc(s: ^State, out: ^[MAX_BUTTONS]Button) -> int {
 		add(out, &n, 72, 64, "Inform", .Inform, target && g.actions > 0 && g.dirt >= game.INFORM_COST_LOW)
 		add(out, &n, 140, 64, "Gift", .Gift, target && g.actions > 0 && g.gifts > 0)
 	case .Mall:
-		add(out, &n, 4, 100, "Buy a gift", .Buy, playing && g.coin >= game.store_price(g.day))
+		add(out, &n, 4, 100, "Buy a gift", .Buy, playing && g.debt + game.store_price(g.day) <= game.card_limit(g))
 	case .Workshop:
 	}
 	add(out, &n, 236, 80, "End day", .End_Day, playing)
@@ -358,7 +358,7 @@ select :: proc(s: ^State, i: int) {
 		sayf(s, "%s is Naughty. The Coal Collection is coming.", name(i))
 	case:
 		r := game.ROSTER[n.role]
-		sayf(s, "%s, %s. Owes %d. Suspicion %d/%d. Likes %s.", r.full, r.label, n.debt, n.suspicion, game.notice_limit(&s.g, i), r.taste)
+		sayf(s, "%s, %s. Owes you %d. Suspicion %d/%d. Likes %s.", r.full, r.label, n.obliged, n.suspicion, game.notice_limit(&s.g, i), r.taste)
 	}
 }
 
@@ -422,7 +422,7 @@ perform :: proc(s: ^State, a: Action) {
 describe :: proc(s: ^State, e: game.Event) {
 	who := name(e.target) if e.target >= 0 else ""
 	#partial switch e.kind {
-	case .No_Actions, .Bad_Target, .Not_Enough_Dirt, .Not_Enough_Coin, .No_Gifts:
+	case .No_Actions, .Bad_Target, .Not_Enough_Dirt, .Card_Declined, .No_Gifts:
 		play(s, .Surveil_Miss) // a refusal: the low blip
 	case .Surveil_Hit:
 		play(s, .Surveil_Hit)
@@ -448,8 +448,8 @@ describe :: proc(s: ^State, e: game.Event) {
 		sayf(s, "%s is not available.", who)
 	case .Not_Enough_Dirt:
 		sayf(s, "A Report needs %d Dirt. Surveil first.", game.INFORM_COST_LOW)
-	case .Not_Enough_Coin:
-		say(s, "Not enough Coin. The Store does not do pity.")
+	case .Card_Declined:
+		say(s, "Card declined. The Store has noticed your balance.")
 	case .No_Gifts:
 		say(s, "No gifts in stock. Buy one at the Mall.")
 	case .Surveil_Hit:
@@ -463,14 +463,14 @@ describe :: proc(s: ^State, e: game.Event) {
 	case .Inform_Backfire:
 		sayf(s, "Report laughed at. %d Merit.", e.amount)
 	case .Gift_Bought:
-		sayf(s, "Gift bought. -%d Coin. Wrap it, tag it, bill it.", e.amount)
+		sayf(s, "Gift bought on the card. +%d Debt. Billed to future you.", e.amount)
 	case .Gift_Delivered:
-		sayf(s, "%s now owes %d more. +%d Merit.", who, e.amount, game.GIFT_MERIT)
+		sayf(s, "%s is touched, and feels obliged. +%d Merit.", who, game.GIFT_MERIT)
 	}
 }
 
 // What happened in the night, as at most two messages: a random event, then the Coal Collection's visit
-// (or a plain night) with the tithes.
+// (or a plain night) with the favours returned.
 @(private)
 night_messages :: proc(s: ^State, r: game.Night_Report) {
 	event := ""
@@ -488,13 +488,13 @@ night_messages :: proc(s: ^State, r: game.Night_Report) {
 	switch {
 	case r.removed >= 0 && event != "":
 		say(s, event)
-		sayf(s, "%s Tithes +%d.", game.ROSTER[r.removed].removed, r.tithe_coin)
+		sayf(s, "%s Favours +%d.", game.ROSTER[r.removed].removed, r.favour_coin)
 	case r.removed >= 0:
-		sayf(s, "%s Tithes +%d.", game.ROSTER[r.removed].removed, r.tithe_coin)
+		sayf(s, "%s Favours +%d.", game.ROSTER[r.removed].removed, r.favour_coin)
 	case event != "":
-		sayf(s, "%s Tithes +%d.", event, r.tithe_coin)
+		sayf(s, "%s Favours +%d.", event, r.favour_coin)
 	case:
-		sayf(s, "Night. Tithes +%d Coin.", r.tithe_coin)
+		sayf(s, "Night. Favours returned +%d Coin.", r.favour_coin)
 	}
 }
 
@@ -506,7 +506,7 @@ end_the_day :: proc(s: ^State) {
 		return
 	}
 	play(s, .Day_End)
-	if r.tithe_coin > 0 {
+	if r.favour_coin > 0 {
 		play(s, .Tithe_Tick)
 	}
 	if r.removed >= 0 {

@@ -27,16 +27,19 @@ INFORM_CHANCE_HIGH :: 0.90
 INFORM_MERIT :: 6
 INFORM_FAIL_MERIT :: -3
 
-// Gift
-GIFT_PRICE :: 5 // Coin; rises by GIFT_PRICE_WEEKLY each week
+// Gift: bought on the Company Store card (it adds to your own Debt, up to the card limit), then delivered.
+GIFT_PRICE :: 5 // added to your Debt; rises by GIFT_PRICE_WEEKLY each week
 GIFT_PRICE_WEEKLY :: 1
 GIFT_MERIT :: 2
-GIFT_DEBT :: 8 // added to the recipient
+GIFT_OBLIGATION :: 12 // the favour the recipient now feels they owe you
+CARD_LIMIT :: 50 // the Store declines a gift that would take your Debt past this
+RUNG_CARD_LIMIT :: 40 // a Head Elf credit line increase, per promotion
 
 // Night
-TITHE_DIVISOR :: 4 // a neighbour pays 1 Coin per 4 Debt
-TITHE_CUT :: 0.5 // the share you keep
-OWN_MIN_PAYMENT :: 1
+RETURN_DIVISOR :: 4 // an obliged neighbour returns a quarter of the favour (1 Coin per 4), rounded up
+RETURN_CUT :: 0.5 // the share of it you keep; the Company Store takes the rest
+OWN_MIN_PAYMENT :: 1 // the card minimum is at least this...
+OWN_MIN_RATE :: 0.05 // ...or this share of your Debt, rounded up, paid from your Coin
 OWN_INTEREST :: 0.03
 COAL_EVERY :: 2 // the Coal Collection takes one Naughty every second night
 
