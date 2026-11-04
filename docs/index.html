@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+	<title>Krimmis</title>
+	<style>
+		html, body { margin: 0; height: 100%; background: #111; color: #888; font: 12px/1.4 monospace; }
+		body { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+		canvas { image-rendering: pixelated; background: #000; touch-action: none; display: block; }
+		footer { margin-top: 8px; text-align: center; max-width: 90vw; }
+		footer a { color: #aaa; }
+	</style>
+</head>
+<body>
+	<canvas id="screen" width="320" height="240"></canvas>
+	<footer>
+		Krimmis by TheGrumpyGameDev. Made with an AI agent (Claude Code) at the author's direction. Font DINOBYTE by mby, https://mby.itch.io/dinobyte, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Tiles Urizen 1-bit by vurmux (CC0). Sprites and sounds made for this game with an AI agent. M mutes.
+		<a href="https://thegrumpygamedev.itch.io/">itch.io</a> · <a href="https://playdeezgames.github.io/oeuvre-of-splorr/">more games</a>
+	</footer>
+	<script src="odin.js"></script>
+	<script>
+	(function () {
+		"use strict";
+		const W = 320, H = 240;
+		const NO_TINT = -1;
+		const screen = document.getElementById("screen");
+		const ctx = screen.getContext("2d");
+		ctx.imageSmoothingEnabled = false;
+		const memory = new odin.WasmMemoryInterface();
+		let ex = null;
+
+		function fit() {
+			let s = Math.min(window.innerWidth / W, (window.innerHeight - 90) / H);
+			s = s >= 1 ? Math.floor(s) : Math.max(s, 0.5);
+			screen.style.width = Math.round(W * s) + "px";
+			screen.style.height = Math.round(H * s) + "px";
+		}
+		window.addEventListener("resize", fit);
+		fit();
+
+		// ---- sheets: Urizen tiles (12 px, 1 px gap, CC0) and DINOBYTE (6 by 8, CP437, CC BY 4.0) ----
+		const sheets = { tiles: new Image(), sprites: new Image(), font: new Image() };
+		sheets.tiles.src = "tileset.png";
+		sheets.sprites.src = "krimmis.png";
+		sheets.font.src = "dbyte_1x.png";
+		const tinted = {}; // "sheet#rrggbb" -> canvas holding the sheet recoloured
+		function tintedSheet(name, rgb) {
+			const key = name + "#" + rgb;
+			let c = tinted[key];
+			if (!c) {
+				const img = sheets[name];
+				c = document.createElement("canvas");
+				c.width = img.width; c.height = img.height;
+				const g = c.getContext("2d");
+				g.drawImage(img, 0, 0);
+				const colour = "#" + (rgb & 0xffffff).toString(16).padStart(6, "0");
+				if (name === "font") {
+					// The font is ink on transparency: paint the ink in the colour.
+					g.globalCompositeOperation = "source-in";
+					g.fillStyle = colour;
+					g.fillRect(0, 0, c.width, c.height);
+				} else {
+					// The tiles are white figures on an opaque black ground: multiply recolours the white and keeps the
+					// black, and destination-in puts the sheet's own transparency (its gaps) back.
+					g.globalCompositeOperation = "multiply";
+					g.fillStyle = colour;
+					g.fillRect(0, 0, c.width, c.height);
+					g.globalCompositeOperation = "destination-in";
+					g.drawImage(img, 0, 0);
+				}
+				tinted[key] = c;
+			}
+			return c;
+		}
+		function ready(name) { return sheets[name].complete && sheets[name].naturalWidth > 0; }
+		function css(rgb) { return "#" + (rgb & 0xffffff).toString(16).padStart(6, "0"); }
+
+		const host = {
+			clear_screen: rgb => { ctx.fillStyle = css(rgb); ctx.fillRect(0, 0, W, H); },
+			fill_rect: (x, y, w, h, rgb) => { ctx.fillStyle = css(rgb); ctx.fillRect(x, y, w, h); },
+			draw_tile: (col, row, x, y, rgb) => {
+				if (!ready("tiles")) return;
+				const src = rgb === NO_TINT ? sheets.tiles : tintedSheet("tiles", rgb);
+				ctx.drawImage(src, 13 * col + 1, 13 * row + 1, 12, 12, x, y, 12, 12);
+			},
+			// The Krimmis sheet (tools/sheet.py): 12 px tiles, 1 px gap, no outer margin.
+				draw_sprite: (col, row, x, y, scale, rgb) => {
+					if (!ready("sprites")) return;
+					const src = rgb === NO_TINT ? sheets.sprites : tintedSheet("sprites", rgb);
+					ctx.drawImage(src, 13 * col, 13 * row, 12, 12, x, y, 12 * scale, 12 * scale);
+				},
+				draw_glyphs_scaled: (ptr, n, x, y, rgb, scale) => {
+				if (!ready("font")) return;
+				const src = rgb === NO_TINT ? sheets.font : tintedSheet("font", rgb);
+				const codes = memory.loadBytes(ptr, n);
+				for (let i = 0; i < n; i++) {
+					const c = codes[i];
+					ctx.drawImage(src, (c % 16) * 6, Math.floor(c / 16) * 8, 6, 8, x + i * 6 * scale, y, 6 * scale, 8 * scale);
+				}
+			},
+			draw_glyphs: (ptr, n, x, y, rgb) => {
+				if (!ready("font")) return;
+				const src = rgb === NO_TINT ? sheets.font : tintedSheet("font", rgb);
+				const codes = memory.loadBytes(ptr, n);
+				for (let i = 0; i < n; i++) {
+					const c = codes[i];
+					ctx.drawImage(src, (c % 16) * 6, Math.floor(c / 16) * 8, 6, 8, x + i * 6, y, 6, 8);
+				}
+			},
+		};
+
+		// ---- sound ----
+		// Same order as ui.Sound in src/ui/ui.odin (index 0 is "none"); wavs from assets/sfx. The browser only lets a
+		// page make sound after a click or key press, so the audio context starts on the first input. M mutes.
+		const SOUNDS = [null, "click", "surveil_hit", "surveil_miss", "report_stamp", "report_backfire", "gift_wrap",
+			"gift_delivered", "tithe_tick", "merit_up", "debt_up", "warning", "day_end", "coal_arrives",
+			"neighbour_removed", "eve_fanfare", "coal_sting", "title_loop"];
+		const MODE_TITLE = 0;
+		let audio = null, muted = false, nextFree = 0, music = null;
+		const raw = {}, buffers = {};
+		SOUNDS.forEach(n => {
+			if (n) fetch("sfx/" + n + ".wav").then(r => r.arrayBuffer()).then(b => { raw[n] = b; decodeAll(); }).catch(() => {});
+		});
+		function decodeAll() {
+			if (!audio) return;
+			for (const n of Object.keys(raw)) {
+				const b = raw[n]; delete raw[n];
+				audio.decodeAudioData(b).then(d => { buffers[n] = d; }).catch(() => {});
+			}
+		}
+		function unlock() {
+			if (!audio) {
+				const AC = window.AudioContext || window.webkitAudioContext;
+				if (!AC) return;
+				audio = new AC();
+				decodeAll();
+			}
+			if (audio.state === "suspended") audio.resume();
+		}
+		// Sounds queue up in the game, one per event; play them in order so a night's jingle, tithes and bell do not pile up.
+		function playSound(id) {
+			const name = SOUNDS[id];
+			if (!audio || muted || !name || !buffers[name]) return;
+			const src = audio.createBufferSource();
+			src.buffer = buffers[name];
+			src.connect(audio.destination);
+			const t = Math.max(audio.currentTime, nextFree);
+			src.start(t);
+			nextFree = t + Math.min(src.buffer.duration, 0.35);
+		}
+		function updateMusic(mode) {
+			const want = mode === MODE_TITLE && audio && !muted && buffers.title_loop;
+			if (want && !music) {
+				music = audio.createBufferSource();
+				music.buffer = buffers.title_loop;
+				music.loop = true;
+				music.connect(audio.destination);
+				music.start();
+			} else if (!want && music) {
+				music.stop();
+				music = null;
+			}
+		}
+		window.addEventListener("keydown", e => {
+			if (e.code === "KeyM" && !e.repeat) muted = !muted;
+		});
+
+		// ---- input ----
+		// Must match ui.Key in src/ui/ui.odin.
+		const KEY = { PLACE_1: 1, PLACE_2: 2, PLACE_3: 3, LEFT: 4, RIGHT: 5, UP: 6, DOWN: 7, SURVEIL: 8, INFORM: 9, GIFT: 10, BUY: 11, END_DAY: 12, CONFIRM: 13 };
+		const KEYS = {
+			Digit1: KEY.PLACE_1, Digit2: KEY.PLACE_2, Digit3: KEY.PLACE_3,
+			ArrowLeft: KEY.LEFT, KeyA: KEY.LEFT, ArrowRight: KEY.RIGHT, KeyD: KEY.RIGHT,
+			ArrowUp: KEY.UP, KeyW: KEY.UP, ArrowDown: KEY.DOWN,
+			KeyS: KEY.SURVEIL, KeyI: KEY.INFORM, KeyG: KEY.GIFT, KeyB: KEY.BUY, KeyE: KEY.END_DAY,
+			Enter: KEY.CONFIRM, Space: KEY.CONFIRM,
+		};
+		window.addEventListener("keydown", e => {
+			if (!ex || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+			const k = KEYS[e.code];
+			if (k === undefined) return;
+			e.preventDefault();
+			unlock();
+				ex.platform_key(k);
+		});
+		screen.addEventListener("pointerdown", e => {
+			e.preventDefault();
+			unlock();
+				if (!ex) return;
+			const r = screen.getBoundingClientRect();
+			ex.platform_click(Math.floor((e.clientX - r.left) / r.width * W), Math.floor((e.clientY - r.top) / r.height * H));
+		});
+
+		// ---- loop ----
+		let last = 0;
+		function frame(t) {
+			const dt = last ? (t - last) / 1000 : 0;
+			last = t;
+			ex.platform_frame(dt);
+				for (let id = ex.platform_sound(); id !== 0; id = ex.platform_sound()) playSound(id);
+				updateMusic(ex.platform_mode());
+			requestAnimationFrame(frame);
+		}
+		function boot() {
+			if (!memory.exports || !memory.exports.platform_frame) { requestAnimationFrame(boot); return; }
+			ex = memory.exports;
+			// QA and screenshots: #title, #play, #eve, #coal or #promotion jumps to that screen (ui.Mode order).
+			const qa = ["title", "play", "eve", "coal", "promotion"].indexOf(location.hash.slice(1));
+			if (qa >= 0) ex.platform_qa_mode(qa);
+			requestAnimationFrame(frame);
+		}
+		odin.runWasm("game.wasm", null, { env: host }, memory);
+		boot();
+	})();
+	</script>
+</body>
+</html>
