@@ -179,7 +179,7 @@ krimmis_eve_with_nothing_done_reveals_then_coal_then_title :: proc(t: ^testing.T
 	testing.expect_value(t, s.mode, Mode.Title)
 	testing.expect_value(t, s.g.day, 1)
 	key(&s, .Confirm)
-	testing.expect_value(t, s.mode, Mode.Play)
+	testing.expect_value(t, s.mode, Mode.Briefing)
 }
 
 @(test)
@@ -209,10 +209,49 @@ the_title_waits_for_a_click_or_enter :: proc(t: ^testing.T) {
 	key(&s, .Place_1)
 	testing.expect_value(t, s.mode, Mode.Title)
 	click(&s, 10, 10)
+	testing.expect_value(t, s.mode, Mode.Briefing)
+	click(&s, 10, 10)
 	testing.expect_value(t, s.mode, Mode.Play)
 	s = new_state(1, .Title)
 	key(&s, .Confirm)
+	key(&s, .Surveil) // ignored on the briefing
+	testing.expect_value(t, s.mode, Mode.Briefing)
+	key(&s, .Confirm)
 	testing.expect_value(t, s.mode, Mode.Play)
+	testing.expect_value(t, message(&s), place_hint(.Neighbourhood))
+}
+
+@(test)
+arriving_in_a_place_says_its_hint_once :: proc(t: ^testing.T) {
+	s := new_state(1)
+	key(&s, .Place_1)
+	testing.expect_value(t, message(&s), place_hint(.Mall))
+	key(&s, .Buy)
+	key(&s, .Place_1) // already here: the buy message stays
+	testing.expect(t, message(&s) != place_hint(.Mall))
+	click_rect(&s, tab_rect(.Workshop))
+	testing.expect_value(t, message(&s), place_hint(.Workshop))
+}
+
+@(test)
+the_briefing_fits_the_screen_and_hints_fit_the_message :: proc(t: ^testing.T) {
+	for line in BRIEFING {
+		testing.expect(t, len(line.text) <= LOG_WIDTH)
+		lower := strings.to_lower(line.text, context.temp_allocator)
+		testing.expect(t, !strings.contains(lower, "christmas") && !strings.contains(lower, "xmas"))
+	}
+	for p in Place {
+		testing.expect(t, len(place_hint(p)) > 0 && len(place_hint(p)) < MESSAGE_CAP)
+	}
+}
+
+@(test)
+a_declined_card_says_how_full_it_is :: proc(t: ^testing.T) {
+	s := new_state(1)
+	key(&s, .Place_1)
+	s.g.debt = game.card_limit(&s.g)
+	key(&s, .Buy)
+	testing.expect(t, strings.has_prefix(message(&s), "Card declined at "))
 }
 
 @(test)

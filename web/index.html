@@ -116,7 +116,7 @@
 		const SOUNDS = [null, "click", "surveil_hit", "surveil_miss", "report_stamp", "report_backfire", "gift_wrap",
 			"gift_delivered", "tithe_tick", "merit_up", "debt_up", "warning", "day_end", "coal_arrives",
 			"neighbour_removed", "eve_fanfare", "coal_sting", "title_loop"];
-		const MODE_TITLE = 0;
+		const MODE_TITLE = 0, MODE_BRIEFING = 5; // ui.Mode numbers; the title tune plays through both
 		let audio = null, muted = false, nextFree = 0, music = null;
 		const raw = {}, buffers = {};
 		SOUNDS.forEach(n => {
@@ -150,7 +150,7 @@
 			nextFree = t + Math.min(src.buffer.duration, 0.35);
 		}
 		function updateMusic(mode) {
-			const want = mode === MODE_TITLE && audio && !muted && buffers.title_loop;
+			const want = (mode === MODE_TITLE || mode === MODE_BRIEFING) && audio && !muted && buffers.title_loop;
 			if (want && !music) {
 				music = audio.createBufferSource();
 				music.buffer = buffers.title_loop;
@@ -205,8 +205,8 @@
 		function boot() {
 			if (!memory.exports || !memory.exports.platform_frame) { requestAnimationFrame(boot); return; }
 			ex = memory.exports;
-			// QA and screenshots: #title, #play, #eve, #coal or #promotion jumps to that screen (ui.Mode order).
-			const qa = ["title", "play", "eve", "coal", "promotion"].indexOf(location.hash.slice(1));
+			// QA and screenshots: #title, #play, #eve, #coal, #promotion or #briefing jumps to that screen (ui.Mode order).
+			const qa = ["title", "play", "eve", "coal", "promotion", "briefing"].indexOf(location.hash.slice(1));
 			if (qa >= 0) ex.platform_qa_mode(qa);
 			requestAnimationFrame(frame);
 		}

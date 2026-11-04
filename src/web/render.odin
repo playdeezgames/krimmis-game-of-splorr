@@ -21,6 +21,8 @@ draw_frame :: proc(s: ^ui.State) {
 	switch s.mode {
 	case .Title:
 		draw_title()
+	case .Briefing:
+		draw_briefing()
 	case .Eve:
 		draw_eve(s)
 	case .Coal:
@@ -71,6 +73,17 @@ draw_title :: proc() {
 	draw_text_centred("is always watching. Your name is on the List.", 162, GREY)
 	draw_text_centred("Click or press Enter to clock in", 188, GOLD)
 	draw_text_centred("1-3 places  arrows pick  S I G B E act", 206, DIM)
+}
+
+draw_briefing :: proc() {
+	clear_screen(BLACK)
+	draw_garland(8)
+	draw_text_big_centred("YOUR FIRST DAY", 20, GOLD, 2)
+	for line, i in ui.BRIEFING {
+		draw_text(line.text, 10, 46 + i * 11, GOLD if line.heading else WHITE)
+	}
+	draw_text_centred("Click or press Enter to start", 212, GREEN)
+	draw_garland(224)
 }
 
 draw_eve :: proc(s: ^ui.State) {

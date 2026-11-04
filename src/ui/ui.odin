@@ -15,14 +15,61 @@ Place :: enum {
 	Workshop,
 }
 
-// What is on screen. Title, Eve, Coal and Promotion are full screens that Enter (or a click) moves past:
-// Title to Play; Eve (the reveal) to Coal or Promotion; Coal back to Title; Promotion on to the new year.
+// What is on screen. Title, Briefing, Eve, Coal and Promotion are full screens that Enter (or a click) moves
+// past: Title to Briefing, Briefing to Play; Eve (the reveal) to Coal or Promotion; Coal back to Title; Promotion on to the new year.
 Mode :: enum {
 	Title,
 	Play,
 	Eve,
 	Coal,
 	Promotion,
+	Briefing, // how to play, between the title and the first day (last, so the page's QA list keeps its numbers)
+}
+
+// The briefing screen, line by line: a heading is drawn in gold. Lines fit the screen (LOG_WIDTH characters).
+Brief_Line :: struct {
+	text:    string,
+	heading: bool,
+}
+
+BRIEFING := [?]Brief_Line {
+	{"Your name is on the Naughty List, and the Coal", false},
+	{"Collection takes the Naughty away. Climb out.", false},
+	{"", false},
+	{"STANDING  Merit, minus a fifth of your Debt", true},
+	{"Keep the bar past the gold tick, the Nice line.", false},
+	{"It rises daily. Be above it on day 24, or coal.", false},
+	{"", false},
+	{"NEIGHBOURHOOD  pick a house; 3 acts a day", true},
+	{" Surveil  dig for Dirt. Misses raise suspicion", false},
+	{" Inform   3+ Dirt: they go Naughty. +Merit", false},
+	{" Gift     a bought gift: +Merit, they owe you", false},
+	{"MALL      buy gifts on the Company Store card", true},
+	{"NIGHT     favours come back as Coin, Coin pays", true},
+	{"          the card bill. Unpaid Debt grows.", false},
+}
+
+// The one-line hint said on arriving in a place.
+place_hint :: proc(p: Place) -> string {
+	switch p {
+	case .Mall:
+		return "Mall: buy a gift on the card (B), then give it in the Neighbourhood."
+	case .Neighbourhood:
+		return "Neighbourhood: pick a house, then Surveil (S), Inform (I) or Gift (G)."
+	case .Workshop:
+		return "Workshop: what you owe. Favours pay the card each night; the rest grows."
+	}
+	return ""
+}
+
+// Moves to a place, with its hint when it is a different one.
+@(private)
+go :: proc(s: ^State, p: Place) {
+	play(s, .Click)
+	if s.place != p {
+		s.place = p
+		say(s, place_hint(p))
+	}
 }
 
 // What the Eve screen reveals, captured before the new year (if any) resets the game.
@@ -265,8 +312,7 @@ click :: proc(s: ^State, x, y: int) {
 	}
 	for p in Place {
 		if in_rect(tab_rect(p), x, y) {
-			s.place = p
-			play(s, .Click)
+			go(s, p)
 			return
 		}
 	}
@@ -295,18 +341,14 @@ key :: proc(s: ^State, k: Key) {
 		}
 		return
 	}
-	#partial switch k {
-	case .Place_1, .Place_2, .Place_3:
-		play(s, .Click)
-	}
 	switch k {
 	case .None:
 	case .Place_1:
-		s.place = .Mall
+		go(s, .Mall)
 	case .Place_2:
-		s.place = .Neighbourhood
+		go(s, .Neighbourhood)
 	case .Place_3:
-		s.place = .Workshop
+		go(s, .Workshop)
 	case .Left:
 		move_selection(s, -1)
 	case .Right:
@@ -334,7 +376,14 @@ key :: proc(s: ^State, k: Key) {
 @(private)
 advance :: proc(s: ^State) {
 	switch s.mode {
-	case .Title, .Promotion:
+	case .Title:
+		s.mode = .Briefing
+		play(s, .Click)
+	case .Briefing:
+		s.mode = .Play
+		play(s, .Click)
+		say(s, place_hint(s.place))
+	case .Promotion:
 		s.mode = .Play
 		play(s, .Click)
 	case .Eve:
@@ -449,7 +498,7 @@ describe :: proc(s: ^State, e: game.Event) {
 	case .Not_Enough_Dirt:
 		sayf(s, "A Report needs %d Dirt. Surveil first.", game.INFORM_COST_LOW)
 	case .Card_Declined:
-		say(s, "Card declined. The Store has noticed your balance.")
+		sayf(s, "Card declined at %d of %d. Favours pay it down at night.", s.g.debt, game.card_limit(&s.g))
 	case .No_Gifts:
 		say(s, "No gifts in stock. Buy one at the Mall.")
 	case .Surveil_Hit:
