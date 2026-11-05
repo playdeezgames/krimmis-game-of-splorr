@@ -9,7 +9,7 @@ import "core:testing"
 // fails after a rules or tuning change, either the rules drifted or the sim needs the same change.
 //
 // Reference values (balance_sim.py, 10000 seeds, rung 0 unless stated):
-//   greedy 0.532, informer 0.357, gifter 0.555, idle 0.000; mean promotions climbed: greedy 0.77, gifter 0.71.
+//   greedy 0.525, informer 0.400, gifter 0.536, idle 0.000; mean promotions climbed: greedy 0.72, gifter 0.69.
 
 @(private = "file")
 Policy :: enum {
@@ -143,9 +143,9 @@ first_year_win_rates_match_the_simulator :: proc(t: ^testing.T) {
 	informer := first_year_win_rate(.Informer, RUNS)
 	gifter := first_year_win_rate(.Gifter, RUNS)
 	log.infof("win rates: greedy %.3f informer %.3f gifter %.3f", greedy, informer, gifter)
-	testing.expect(t, abs(greedy - 0.532) < RATE_TOLERANCE)
-	testing.expect(t, abs(informer - 0.357) < RATE_TOLERANCE)
-	testing.expect(t, abs(gifter - 0.555) < RATE_TOLERANCE)
+	testing.expect(t, abs(greedy - 0.525) < RATE_TOLERANCE)
+	testing.expect(t, abs(informer - 0.400) < RATE_TOLERANCE)
+	testing.expect(t, abs(gifter - 0.536) < RATE_TOLERANCE)
 	testing.expect_value(t, first_year_win_rate(.Idle, 500), 0.0)
 }
 
@@ -155,6 +155,6 @@ promotion_climbs_match_the_simulator :: proc(t: ^testing.T) {
 	greedy := mean_climbs(.Greedy, RUNS)
 	gifter := mean_climbs(.Gifter, RUNS)
 	log.infof("mean climbs: greedy %.3f gifter %.3f", greedy, gifter)
-	testing.expect(t, abs(greedy - 0.769) < CLIMB_TOLERANCE)
-	testing.expect(t, abs(gifter - 0.709) < CLIMB_TOLERANCE)
+	testing.expect(t, abs(greedy - 0.72) < CLIMB_TOLERANCE)
+	testing.expect(t, abs(gifter - 0.69) < CLIMB_TOLERANCE)
 }

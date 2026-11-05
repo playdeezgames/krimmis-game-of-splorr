@@ -8,8 +8,9 @@ P = dict(days=24, acts=3, neigh=12,
   gift_cost=5, gift_merit=2, gift_debt=12, tithe_div=4, cut=0.5,
   start_coin=30, start_debt=30, interest=0.03, minpay=1, min_rate=0.05, card_limit=50, rung_limit=40,
   store_inc_per_week=1, remove_every=2,
-  rung_slope=0.05, rung_price=0, rung_interest=0.002, promo_debt=0, line_a=10, line_b=1.7,
+  rung_slope=0.05, rung_price=0, rung_interest=0.002, promo_debt=0, line_a=10, line_b=1.55,
   nosy=3, oblivious=5, grudge_step=1, grudge_cap=1,
+  quota_you_p=0.6, knock_pen=2, knock_limit=3,
   audit_p=0.08, audit_fail=-3, audit_pass=3, tip_p=0.10, tip_dirt=2, santa_p=0.06)
 # The street, in house order. Nosy neighbours notice you sooner; oblivious ones later (see the vault roster).
 NOSY=[True,False,False,True,False,True,False,True,False,True,True,False]
@@ -22,7 +23,7 @@ def run(policy, P, seed, carry=None, rung=0, rng=None):
     N=[fresh(i,P) for i in range(P['neigh'])]
     if carry:
         coin,debt,N=carry
-    warn=0; santa=False
+    warn=0; santa=False; knocks=0
     for d in range(1,P['days']+1):
         acts=P['acts']-(1 if santa else 0); santa=False
         price=P['gift_cost']+(d-1)//7*P['store_inc_per_week']+P['rung_price']*rung
@@ -50,7 +51,17 @@ def run(policy, P, seed, carry=None, rung=0, rng=None):
             if n['debt']>0:
                 pay=min(n['debt'],-(-n['debt']//P['tithe_div'])); n['debt']-=pay; coin+=int(pay*P['cut'])
         naughty=[n for n in N if n['alive'] and n['naughty']]
-        if naughty and d%int(P['remove_every'])==0: r.choice(naughty)['alive']=False
+        if d%int(P['remove_every'])==0:
+            if naughty: r.choice(naughty)['alive']=False
+            else:
+                # The quota: nobody is Naughty, so the street names someone. If you are behind the Nice line it may be you.
+                nice=[n for n in N if n['alive'] and not n['naughty']]
+                if merit-debt//5<line(P,d,rung) and r.random()<P['quota_you_p'] or not nice:
+                    knocks+=1; warn+=1; merit-=P['knock_pen']
+                    if knocks>=P['knock_limit']:
+                        run.last=(coin,debt,N)
+                        return False, merit-debt//5, merit, debt, sum(n['alive'] for n in N)
+                else: r.choice(nice)['alive']=False
         due=max(P['minpay'],math.ceil(debt*P['min_rate']))
         pay=min(coin,due); coin-=pay; debt-=pay
         shortfall=due-pay; debt+=shortfall

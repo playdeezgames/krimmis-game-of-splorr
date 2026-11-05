@@ -35,6 +35,7 @@ new_game_has_twelve_clean_living_neighbours :: proc(t: ^testing.T) {
 @(test)
 calendar_runs_to_krimmis_eve_then_refuses :: proc(t: ^testing.T) {
 	g := new_game(1)
+	g.merit = 1000 // on pace all year, so the quota never knocks
 	for _ in 1 ..< DAYS {
 		r := end_day(&g)
 		testing.expect(t, !r.refused && !r.eve)
@@ -58,7 +59,7 @@ standing_is_merit_less_a_fifth_of_debt :: proc(t: ^testing.T) {
 
 @(test)
 nice_line_matches_the_paper_numbers :: proc(t: ^testing.T) {
-	testing.expect(t, abs(nice_line(DAYS) - 50.8) < 0.001)
+	testing.expect(t, abs(nice_line(DAYS) - 47.2) < 0.001)
 	testing.expect(t, nice_line(1) < nice_line(2))
 }
 

@@ -53,12 +53,90 @@ coal_comes_on_even_nights_only_and_takes_one_naughty :: proc(t: ^testing.T) {
 }
 
 @(test)
-coal_does_not_come_when_nobody_is_naughty :: proc(t: ^testing.T) {
+the_coal_collection_only_calls_every_second_night :: proc(t: ^testing.T) {
 	g := new_game(5)
-	end_day(&g)
 	r := end_day(&g)
 	testing.expect_value(t, r.removed, -1)
+	testing.expect(t, !r.knocked)
 	testing.expect_value(t, alive_count(&g), 12)
+}
+
+@(test)
+on_pace_with_nobody_naughty_the_street_names_a_neighbour :: proc(t: ^testing.T) {
+	g := new_game(5)
+	g.merit = 100
+	end_day(&g)
+	r := end_day(&g)
+	testing.expect(t, r.named && !r.knocked)
+	testing.expect(t, r.removed >= 0 && !g.neighbours[r.removed].alive)
+	testing.expect_value(t, alive_count(&g), 11)
+	testing.expect_value(t, g.knocks, 0)
+}
+
+// Runs to the second night with Standing behind the line, over seeds, until the street names you.
+@(private = "file")
+first_knock :: proc() -> (Game, Night_Report) {
+	for seed in u64(1) ..< 1000 {
+		g := new_game(seed)
+		end_day(&g)
+		if r := end_day(&g); r.knocked {
+			return g, r
+		}
+	}
+	panic("no knock found")
+}
+
+@(test)
+behind_the_line_the_street_sometimes_names_you :: proc(t: ^testing.T) {
+	knocks, named := 0, 0
+	for seed in u64(1) ..= 2000 {
+		g := new_game(seed)
+		end_day(&g)
+		r := end_day(&g)
+		knocks += 1 if r.knocked else 0
+		named += 1 if r.named else 0
+	}
+	testing.expect_value(t, knocks + named, 2000)
+	testing.expect(t, abs(f64(knocks) / 2000 - QUOTA_YOU_CHANCE) < 0.03)
+}
+
+@(test)
+a_knock_is_a_warning_and_lost_merit :: proc(t: ^testing.T) {
+	g, r := first_knock()
+	testing.expect_value(t, r.removed, -1)
+	testing.expect_value(t, alive_count(&g), 12)
+	testing.expect_value(t, g.knocks, 1)
+	testing.expect_value(t, g.warnings, 1)
+	testing.expect_value(t, g.merit, -KNOCK_PENALTY)
+	testing.expect(t, !r.coal)
+}
+
+@(test)
+the_last_knock_is_coal_and_ends_the_calendar :: proc(t: ^testing.T) {
+	g, _ := first_knock()
+	g.knocks = KNOCK_LIMIT - 1
+	g.day = 4 // another quota night
+	for &n in g.neighbours {
+		n.alive = false // nobody else to name
+	}
+	debt := g.debt
+	r := end_day(&g)
+	testing.expect(t, r.knocked && r.coal)
+	testing.expect_value(t, g.outcome, Outcome.Coal)
+	testing.expect_value(t, g.debt, debt) // nothing after the knock ran
+	testing.expect(t, end_day(&g).refused)
+	testing.expect_value(t, resolve_eve(&g), Outcome.Coal)
+}
+
+@(test)
+knocks_reset_with_the_new_year :: proc(t: ^testing.T) {
+	g := new_game(1)
+	g.knocks = 2
+	g.day = DAYS
+	g.merit = 1000
+	end_day(&g)
+	testing.expect_value(t, resolve_eve(&g), Outcome.Promoted)
+	testing.expect_value(t, g.knocks, 0)
 }
 
 @(test)

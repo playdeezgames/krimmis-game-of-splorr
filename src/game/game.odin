@@ -26,6 +26,7 @@ Game :: struct {
 	coin:       int,
 	debt:       int, // your own Debt to Krimmis Inc.
 	warnings:   int,
+	knocks:     int, // times the street named you to fill the quota this year; KNOCK_LIMIT is coal
 	santa_watching: bool, // Kris Krinkle was seen: one action fewer on the next day
 	eve_reached: bool, // the night of day DAYS has run; the calendar is over
 	rung:       int, // promotions so far: 0 is a mall-elf, 1 and up are Head Elf years

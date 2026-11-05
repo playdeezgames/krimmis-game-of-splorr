@@ -33,6 +33,7 @@ next_year :: proc(g: ^Game) {
 	g.dirt = 0
 	g.gifts = 0
 	g.warnings = 0
+	g.knocks = 0
 	g.santa_watching = false
 	g.coin = max(g.coin, START_COIN)
 	g.eve_reached = false

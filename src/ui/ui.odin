@@ -47,6 +47,8 @@ BRIEFING := [?]Brief_Line {
 	{"MALL      buy gifts on the Company Store card", true},
 	{"NIGHT     favours come back as Coin, Coin pays", true},
 	{"          the card bill. Unpaid Debt grows.", false},
+	{"QUOTA     every 2nd night someone is collected.", true},
+	{"          Nobody Naughty? The street may name you.", false},
 }
 
 // The one-line hint said on arriving in a place.
@@ -132,6 +134,7 @@ Sound :: enum {
 }
 
 SOUND_QUEUE :: 8
+HOLD_SECONDS :: 0.8 // how long the Eve and coal screens ignore input
 
 MESSAGE_CAP :: 104
 LOG_VISIBLE :: 4 // lines of event log on screen
@@ -151,7 +154,10 @@ State :: struct {
 	message:  [MESSAGE_CAP]u8, // the latest message, whole
 	msg_len:  int,
 	log:      [LOG_VISIBLE]Log_Line, // the latest messages wrapped into lines, newest at the bottom
-	latest:   int, // how many of the bottom lines belong to the latest message
+	latest:   int, // how many of the bottom lines belong to the latest message (or the night's messages)
+	batch:    bool, // while set, each message adds to latest instead of replacing it (the night's summary)
+	knocked_out: bool, // the coal came early: the street named you to fill the quota once too often
+	hold:     f64, // seconds before a full screen takes input, so a burst of End day clicks cannot skip the verdict
 	eve:      Eve_Report,
 	verdict:  game.Outcome, // Coal or Promoted, shown after the reveal
 	sounds:   [SOUND_QUEUE]Sound, // sounds waiting for the page, oldest first
@@ -206,7 +212,9 @@ say :: proc(s: ^State, text: string) {
 @(private)
 push_log :: proc(s: ^State, text: string) {
 	rest := text
-	s.latest = 0
+	if !s.batch {
+		s.latest = 0
+	}
 	for len(rest) > 0 {
 		cut := len(rest)
 		if cut > LOG_WIDTH {
@@ -224,7 +232,7 @@ push_log :: proc(s: ^State, text: string) {
 		line: Log_Line
 		line.n = copy(line.text[:], rest[:cut])
 		s.log[LOG_VISIBLE - 1] = line
-		s.latest = min(s.latest + 1, LOG_VISIBLE)
+		s.latest += 1 // may pass LOG_VISIBLE in a long night; a_whole_night_fits_in_the_log keeps it from doing so
 		rest = rest[cut:]
 		for len(rest) > 0 && rest[0] == ' ' {
 			rest = rest[1:]
@@ -304,10 +312,17 @@ target_ok :: proc(g: ^game.Game, i: int) -> bool {
 
 // ---- input --------------------------------------------------------------------------------------------
 
+// Time passing, from the page's frame loop: runs down the hold on a full screen.
+tick :: proc(s: ^State, dt: f64) {
+	s.hold = max(0, s.hold - dt)
+}
+
 // A click or tap at a point on the 320 by 240 screen.
 click :: proc(s: ^State, x, y: int) {
 	if s.mode != .Play {
-		advance(s)
+		if s.hold <= 0 {
+			advance(s)
+		}
 		return
 	}
 	for p in Place {
@@ -336,7 +351,7 @@ click :: proc(s: ^State, x, y: int) {
 
 key :: proc(s: ^State, k: Key) {
 	if s.mode != .Play {
-		if k == .Confirm {
+		if k == .Confirm && s.hold <= 0 {
 			advance(s)
 		}
 		return
@@ -518,32 +533,48 @@ describe :: proc(s: ^State, e: game.Event) {
 	}
 }
 
-// What happened in the night, as at most two messages: a random event, then the Coal Collection's visit
-// (or a plain night) with the favours returned.
+// What happened in the night, all of it lit as the latest: the Coal Collection's call, then the money (every
+// number that moved, so nothing changes unexplained), then the random event. Kept to LOG_VISIBLE lines: the
+// call takes at most two, the money and the event one each.
 @(private)
 night_messages :: proc(s: ^State, r: game.Night_Report) {
-	event := ""
+	s.batch = true
+	defer s.batch = false
+	s.latest = 0
+	collection_message(s, r)
+	if r.coal {
+		return
+	}
+	if r.own_missed > 0 {
+		sayf(s, "Favours +%d. Card -%d, %d unpaid. Interest +%d Debt.", r.favour_coin, r.own_paid, r.own_missed, r.interest)
+	} else {
+		sayf(s, "Favours +%d Coin. Card -%d Coin. Interest +%d Debt.", r.favour_coin, r.own_paid, r.interest)
+	}
 	switch r.event {
 	case .None:
 	case .Audit_Pass:
-		event = fmt.tprintf("Surprise audit! Management is pleased. +%d Merit.", r.event_amount)
+		sayf(s, "Audit! Management is pleased. +%d Merit.", r.event_amount)
 	case .Audit_Fail:
-		event = fmt.tprintf("Surprise audit! Management finds you wanting. %d Merit.", r.event_amount)
+		sayf(s, "Audit! Management finds you wanting. %d Merit.", r.event_amount)
 	case .Tip_Off:
-		event = fmt.tprintf("A neighbour slips you a note under the door. +%d Dirt.", r.event_amount)
+		sayf(s, "A note under the door from a neighbour. +%d Dirt.", r.event_amount)
 	case .Santa:
-		event = "Kris Krinkle was seen on the street. Fewer actions tomorrow."
+		say(s, "Kris Krinkle seen on the street. One act fewer.")
 	}
+}
+
+// The Coal Collection's visit: a Naughty neighbour taken, or the quota filled by the street naming someone.
+@(private)
+collection_message :: proc(s: ^State, r: game.Night_Report) {
 	switch {
-	case r.removed >= 0 && event != "":
-		say(s, event)
-		sayf(s, "%s Favours +%d.", game.ROSTER[r.removed].removed, r.favour_coin)
+	case r.coal:
+		say(s, "Nobody was Naughty, so the street named you. Again.")
+	case r.knocked:
+		sayf(s, "Nobody was Naughty, so the street named you. Knock %d of %d. %d Merit.", s.g.knocks, game.KNOCK_LIMIT, -game.KNOCK_PENALTY)
+	case r.named:
+		sayf(s, "Nobody was Naughty, so the street named %s, and the Coal Collection took them.", name(r.removed))
 	case r.removed >= 0:
-		sayf(s, "%s Favours +%d.", game.ROSTER[r.removed].removed, r.favour_coin)
-	case event != "":
-		sayf(s, "%s Favours +%d.", event, r.favour_coin)
-	case:
-		sayf(s, "Night. Favours returned +%d Coin.", r.favour_coin)
+		say(s, game.ROSTER[r.removed].removed)
 	}
 }
 
@@ -562,6 +593,20 @@ end_the_day :: proc(s: ^State) {
 		play(s, .Coal_Arrives)
 		play(s, .Neighbour_Removed)
 	}
+	if r.knocked {
+		play(s, .Coal_Arrives)
+		play(s, .Warning)
+	}
+	if r.coal {
+		night_messages(s, r)
+		s.verdict = .Coal
+		s.knocked_out = true
+		s.selected = -1
+		s.mode = .Coal
+		s.hold = HOLD_SECONDS
+		play(s, .Coal_Sting)
+		return
+	}
 	if r.own_missed > 0 {
 		play(s, .Debt_Up)
 	}
@@ -579,8 +624,11 @@ end_the_day :: proc(s: ^State) {
 		return
 	}
 	taken := ""
-	if r.removed >= 0 {
+	switch {
+	case r.removed >= 0:
 		taken = fmt.tprintf(" %s was taken.", name(r.removed))
+	case r.knocked:
+		taken = " The street named you."
 	}
 	// Capture the reveal before a promotion resets the game for the new year.
 	s.eve = Eve_Report {
@@ -594,6 +642,7 @@ end_the_day :: proc(s: ^State) {
 	s.verdict = game.resolve_eve(g)
 	s.selected = -1
 	s.mode = .Eve
+	s.hold = HOLD_SECONDS
 	sayf(s, "Krimmis Eve.%s Kris Krinkle checks the List.", taken)
 }
 

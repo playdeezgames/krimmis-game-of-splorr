@@ -162,17 +162,19 @@ removal_clears_the_selection :: proc(t: ^testing.T) {
 }
 
 @(test)
-krimmis_eve_with_nothing_done_reveals_then_coal_then_title :: proc(t: ^testing.T) {
+krimmis_eve_short_of_the_line_reveals_then_coal_then_title :: proc(t: ^testing.T) {
 	s := new_state(1)
-	for _ in 0 ..< game.DAYS {
-		key(&s, .End_Day)
-	}
+	s.g.day = game.DAYS
+	key(&s, .End_Day)
 	testing.expect_value(t, s.mode, Mode.Eve)
 	testing.expect_value(t, s.verdict, game.Outcome.Coal)
 	testing.expect_value(t, s.eve.year, 1)
 	testing.expect_value(t, s.eve.standing, game.standing(&s.g))
 	key(&s, .End_Day) // ignored on a full screen
 	testing.expect_value(t, s.mode, Mode.Eve)
+	key(&s, .Confirm) // too soon: the reveal holds for a moment
+	testing.expect_value(t, s.mode, Mode.Eve)
+	tick(&s, HOLD_SECONDS)
 	key(&s, .Confirm)
 	testing.expect_value(t, s.mode, Mode.Coal)
 	key(&s, .Confirm)
@@ -195,6 +197,7 @@ a_promotion_shows_the_reveal_then_the_promotion_then_the_new_year :: proc(t: ^te
 	testing.expect_value(t, s.eve.year, 1)
 	testing.expect_value(t, s.g.rung, 1)
 	testing.expect_value(t, s.g.merit, 0)
+	tick(&s, HOLD_SECONDS)
 	key(&s, .Confirm)
 	testing.expect_value(t, s.mode, Mode.Promotion)
 	key(&s, .Confirm)
@@ -259,9 +262,9 @@ status_lines_show_the_numbers :: proc(t: ^testing.T) {
 	s := new_state(1)
 	buf: [80]u8
 	testing.expect_value(t, status_line(&s, buf[:]), "Acts 3  Merit 0  Dirt 0  Coin 30  Debt 30  Warn 0")
-	testing.expect_value(t, standing_text(&s, buf[:]), "-6/51")
+	testing.expect_value(t, standing_text(&s, buf[:]), "-6/47")
 	s.g.rung = 1
-	testing.expect_value(t, standing_text(&s, buf[:]), "Y2 -6/52")
+	testing.expect_value(t, standing_text(&s, buf[:]), "Y2 -6/48")
 }
 
 @(test)
@@ -270,11 +273,11 @@ standing_bar_follows_standing_and_the_pace :: proc(t: ^testing.T) {
 	b := standing_bar(&s)
 	testing.expect_value(t, b.fill, 0.0) // negative Standing clamps to empty
 	testing.expect(t, !b.ahead)
-	testing.expect(t, b.mark > 0 && b.mark < 0.3) // day 1 line is 11.7 of 50.8
+	testing.expect(t, b.mark > 0 && b.mark < 0.3) // day 1 line is 11.55 of 47.2
 	s.g.merit = 30
 	s.g.debt = 0
 	b = standing_bar(&s)
-	testing.expect(t, abs(b.fill - 30.0 / 50.8) < 0.001)
+	testing.expect(t, abs(b.fill - 30.0 / 47.2) < 0.001)
 	testing.expect(t, b.ahead)
 	s.g.merit = 200
 	testing.expect_value(t, standing_bar(&s).fill, 1.0)
@@ -363,8 +366,13 @@ the_coal_collections_visit_reads_the_removed_neighbours_line :: proc(t: ^testing
 	s.g.neighbours[0].naughty = true
 	key(&s, .End_Day)
 	key(&s, .End_Day) // night of day 2
-	testing.expect(t, strings.contains(message(&s), "Karen asked the Coal Collection for their supervisor."))
-	testing.expect(t, strings.contains(message(&s), "Favours +"))
+	lit := strings.builder_make(context.temp_allocator)
+	for i in LOG_VISIBLE - s.latest ..< LOG_VISIBLE {
+		strings.write_string(&lit, log_line(&s, i))
+		strings.write_byte(&lit, ' ')
+	}
+	testing.expect(t, strings.contains(strings.to_string(lit), "Karen asked the Coal Collection"))
+	testing.expect(t, strings.contains(strings.to_string(lit), "Favours +"))
 }
 
 drain :: proc(s: ^State) -> [dynamic]Sound {
@@ -447,4 +455,72 @@ the_verdict_has_its_own_sound :: proc(t: ^testing.T) {
 	s.verdict = .Promoted
 	click(&s, 0, 0)
 	testing.expect_value(t, drain(&s)[0], Sound.Eve_Fanfare)
+}
+
+@(test)
+doing_nothing_gets_you_named_and_coal_before_eve :: proc(t: ^testing.T) {
+	s := new_state(1)
+	for _ in 0 ..< game.DAYS {
+		if s.mode != .Play {
+			break
+		}
+		key(&s, .End_Day)
+	}
+	testing.expect_value(t, s.mode, Mode.Coal)
+	testing.expect(t, s.knocked_out)
+	testing.expect(t, s.g.day < game.DAYS)
+	testing.expect_value(t, s.g.knocks, game.KNOCK_LIMIT)
+	testing.expect(t, strings.contains(message(&s), "the street named you"))
+	click(&s, 280, 186) // a stray End day click lands on the coal screen and is ignored
+	testing.expect_value(t, s.mode, Mode.Coal)
+	tick(&s, HOLD_SECONDS)
+	key(&s, .Confirm)
+	testing.expect_value(t, s.mode, Mode.Title)
+	testing.expect(t, !s.knocked_out)
+}
+
+@(test)
+the_night_summary_explains_every_number_and_is_all_lit :: proc(t: ^testing.T) {
+	s := new_state(1)
+	key(&s, .End_Day)
+	found := false
+	for i in 0 ..< LOG_VISIBLE {
+		if strings.has_prefix(log_line(&s, i), "Favours +0 Coin. Card -2 Coin.") {
+			found = true
+			testing.expect(t, i >= LOG_VISIBLE - s.latest) // lit as part of the night
+		}
+	}
+	testing.expect(t, found)
+}
+
+@(test)
+a_knock_is_explained_with_the_count :: proc(t: ^testing.T) {
+	for seed in u64(1) ..< 200 {
+		s := new_state(seed)
+		key(&s, .End_Day)
+		key(&s, .End_Day)
+		if s.g.knocks == 1 {
+			testing.expect(t, strings.contains(log_line(&s, LOG_VISIBLE - s.latest), "Nobody was Naughty"))
+			return
+		}
+	}
+	testing.fail_now(t, "no knock found")
+}
+
+@(test)
+a_whole_night_fits_in_the_log :: proc(t: ^testing.T) {
+	worst := 0
+	for seed in u64(1) ..= 300 {
+		s := new_state(seed)
+		s.g.neighbours[seed % game.NEIGHBOURS].naughty = seed % 3 == 0
+		for _ in 0 ..< 10 {
+			if s.mode != .Play {
+				break
+			}
+			key(&s, .End_Day)
+			worst = max(worst, s.latest)
+			testing.expect(t, s.msg_len < MESSAGE_CAP) // nothing cut short
+		}
+	}
+	testing.expect(t, worst <= LOG_VISIBLE)
 }

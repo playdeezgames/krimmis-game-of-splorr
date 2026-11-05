@@ -80,7 +80,7 @@ draw_briefing :: proc() {
 	draw_garland(8)
 	draw_text_big_centred("YOUR FIRST DAY", 20, GOLD, 2)
 	for line, i in ui.BRIEFING {
-		draw_text(line.text, 10, 46 + i * 11, GOLD if line.heading else WHITE)
+		draw_text(line.text, 10, 44 + i * 10, GOLD if line.heading else WHITE)
 	}
 	draw_text_centred("Click or press Enter to start", 212, GREEN)
 	draw_garland(224)
@@ -108,8 +108,13 @@ draw_coal :: proc(s: ^ui.State) {
 	clear_screen(0x180000)
 	draw_garland(8)
 	draw_text_big_centred("COAL", 28, RED, 6)
-	draw_text_centred("You have been moved to the Naughty column.", 84, WHITE)
-	draw_text_centred("The Coal Collection will see you now.", 98, WHITE)
+	if s.knocked_out {
+		draw_text_centred("The Coal Collection had a quota to fill.", 84, WHITE)
+		draw_text_centred("Your neighbours filled it with you.", 98, WHITE)
+	} else {
+		draw_text_centred("You have been moved to the Naughty column.", 84, WHITE)
+		draw_text_centred("The Coal Collection will see you now.", 98, WHITE)
+	}
 	put_sprite(.Coal_Collection, (SCREEN_W - 36) / 2, 108, 0x909090, 3)
 	draw_text_centred("Your Debt is forgiven (by the Coal Collection).", 146, GREY)
 	draw_text_centred("Merry Krimmis from all of us at Krimmis Inc.", 166, GOLD)

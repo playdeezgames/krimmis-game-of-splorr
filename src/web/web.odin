@@ -60,6 +60,7 @@ platform_mode :: proc "c" () -> i32 {
 @(export)
 platform_frame :: proc "c" (dt: f64) {
 	context = runtime.default_context()
+	ui.tick(&s, dt)
 	draw_frame(&s)
 	free_all(context.temp_allocator)
 }

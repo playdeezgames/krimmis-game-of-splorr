@@ -92,7 +92,7 @@ rich_coin_is_kept_on_promotion :: proc(t: ^testing.T) {
 @(test)
 each_rung_raises_the_line_and_the_interest :: proc(t: ^testing.T) {
 	testing.expect(t, nice_line(DAYS, 1) > nice_line(DAYS, 0))
-	testing.expect(t, abs(nice_line(DAYS, 2) - (10 + (1.7 + 0.1) * 24)) < 0.001)
+	testing.expect(t, abs(nice_line(DAYS, 2) - (10 + (1.55 + 0.1) * 24)) < 0.001)
 	a := new_game(1)
 	a.debt = 1000
 	b := a
